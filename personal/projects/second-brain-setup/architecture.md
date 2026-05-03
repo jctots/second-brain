@@ -226,10 +226,30 @@ User pushes to Gitea
 
 ```
 User runs /sync-memory
-  → Claude updates project _memory.md (in-place, fixed sections)
-  → Claude updates decisions.md (prepends new entry if decision was made)
-  → Claude updates _self/about.md (merges new observations)
-  → Claude updates _self/rules.md if behavioral correction warranted
+  → reads _inbox/memory-queue.md
+      → groups entries by target file
+      → for each target: reads file, consolidates candidates, drafts minimal update
+      → writes each update using Edit (never Write)
+      → removes processed entries from queue
+  → if queue was empty: falls back to retrospective scan of current conversation
+  → updates _self/about.md if new profile facts observed
+  → updates _self/rules.md if behavioral correction warranted
+  → prepends to decisions.md if an architectural decision was made
+```
+
+### Distill (user-triggered `/distill`)
+
+```
+User runs /distill
+  → reads _inbox/distill-queue.md
+  → for each pending entry:
+      → reads source conversation file
+      → drafts note content (structured, concise — areas/ or resources/)
+      → presents: proposed path + draft content + placement reason
+      → iterates with user until confirmed or skipped
+      → on confirm: writes note (Edit if exists, Write if new); updates dashboard.md
+      → on skip: leaves entry in queue unchanged
+  → removes only confirmed entries from queue
 ```
 
 ---
@@ -263,7 +283,6 @@ Three layers control Claude's behavior:
 |---|---|---|
 | Hooks | `.claude/settings.json` | The harness — always runs, no Claude judgment |
 | Instructions | `CLAUDE.md` (any level) | Claude — depends on compliance each turn |
-| Auto-memory | Not used (D94) — all memory in vault | N/A |
 
 ---
 
@@ -405,7 +424,8 @@ Location: `.claude/commands/`
 
 | Command | When to use |
 |---|---|
-| `/sync-memory` | End of any session where decisions were made or project state changed |
+| `/sync-memory` | Process `_inbox/memory-queue.md` — run when queue has items or at session end |
+| `/distill` | Process `_inbox/distill-queue.md` — interactive, one entry at a time |
 | `/housekeeping` | Periodic maintenance — classify conversations, check budgets, regenerate indexes |
 | `/commit` | Stage and commit — Claude proposes commit message, user confirms |
 | `/audit` | Scan all active projects for structural gaps — report only |
@@ -428,7 +448,7 @@ Adding a new command: create `.claude/commands/{name}.md`. No registration requi
 | Regenerate conversation + project indexes | Gitea Actions | Guaranteed on push to main |
 | Infer context and confirm with user | CLAUDE.md instruction | Unreliable |
 | `/sync-memory` trigger | User-invoked slash command | Reliable — user-triggered |
-| Load auto-memory index | Not applicable — workspace memory retired (D94) | N/A |
+| `/distill` trigger | User-invoked slash command | Reliable — user-triggered |
 
 ---
 

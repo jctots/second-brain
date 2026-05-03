@@ -76,10 +76,10 @@ created: YYYY-MM-DD
 ## System constraints
 
 - All scripts and hooks must work on Windows and Linux/macOS; a fresh clone must reach the same state via setup scripts
-- Prefer CI (Gitea Actions or GitHub Actions) for deterministic artifacts (indexes, summaries); local hooks only for commit-blocking validation
-- No always-on processes — CI for scheduled work, not daemons or persistent MCP servers as hard dependencies
+- Prefer Gitea Actions for deterministic artifacts (indexes, summaries); local hooks only for commit-blocking validation
+- No always-on processes — Gitea Actions for scheduled work, not daemons or persistent MCP servers as hard dependencies
 - Never edit generated file sections (`_conversations/index.md`, `## files` and `## relevant conversations` in project `index.md` files)
-- Framework improvements flow via branch → PR to the upstream; content paths never reach the public repository
+- Public sync is judgment-driven (`/publish`), never automated; content paths never reach GitHub
 
 ## Project files
 
@@ -97,7 +97,7 @@ Each active project folder may contain a `_memory.md` file — a running log of 
 
 **Trigger:** Run `/sync-memory` at any point in a conversation. Steps are defined in `.claude/commands/sync-memory.md`.
 
-**Reminder:** At the end of each working session where significant decisions or context changes occurred, remind the user: _"Run `/sync-memory` if you'd like me to save anything from this session."_
+**Reminder:** At the end of each working session, if `_inbox/memory-queue.md` has unprocessed entries, remind the user: _"There are items in the memory queue — run `/sync-memory` to process them."_
 
 ## Context at conversation start
 
@@ -105,7 +105,7 @@ At the start of each conversation, infer which context (personal/professional/pu
 
 Example: _"This looks like `personal/projects/health-tracking`. Should I load that context?"_
 
-When project names are mentioned in the first message, `_scripts/inject-context-claude.py` and `_scripts/inject-context-memory.py` automatically inject the project's `CLAUDE.md` and `_memory.md` into the context window. If a project was mentioned but its context was not injected (hook miss or later message), search for it at `{personal,professional,public}/projects/{name}/` — not with a filename glob.
+When project names are mentioned in the first message, `_scripts/inject-context.py` automatically injects their `CLAUDE.md` and `_memory.md` into the context window. If a project was mentioned but its context was not injected (hook miss or later message), search for it at `{personal,professional,public}/projects/{name}/` — not with a filename glob.
 
 **Hook verification:** At the start of every conversation, state in one line which project context files were loaded, e.g.: _"Loaded: `personal/projects/second-brain-setup/CLAUDE.md` + `_memory.md`"_. If no project context was injected, say so. This lets you verify hook status without asking.
 
@@ -126,7 +126,8 @@ When project names are mentioned in the first message, `_scripts/inject-context-
 - When creating a new note or project file, check `_templates/` first for a relevant template
 - Prefer editing existing notes over creating new ones
 - Flag if a note in `_inbox/` has been sitting there too long without processing
-- During conversations, if something discussed would make a good `areas/` or `resources/` entry, surface it — present the suggestion with a proposed path and a one-line reason
+- During conversations, if something discussed would make a good `areas/` or `resources/` entry: (1) append the entry to `_inbox/distill-queue.md` using Edit, format: `- [topic] — context: "one-line reasoning why this is worth keeping" — proposed: \`path/to/note.md\` — source: [[_conversations/YYYY/MM/filename]]`; (2) notify in one line: `→ added to distill queue: [topic]`. Do not elaborate or branch the conversation. Run `/distill` to process the queue interactively.
+- During conversations, if a memory-worthy item is observed — project state change, decision, profile fact, or behavioral feedback: (1) append the entry to `_inbox/memory-queue.md` using Edit, format: `- [topic] — context: "one-line snippet capturing the key reasoning" — target: \`path/to/memory-file.md\` — source: [[_conversations/YYYY/MM/filename]]`; (2) notify in one line: `→ added to memory queue: [topic]`. Do not elaborate or branch the conversation. Run `/sync-memory` to process the queue.
 - When a new `areas/` or `resources/` file is created, or a new project is created, update `dashboard.md` — add the wikilink to the correct context section and PARA line
 
 ## Token and cost awareness

@@ -114,7 +114,7 @@ Index files and project file lists are generated artifacts, never edited manuall
 The framework and content layers must be structurally separated and enforced at the git level — not by convention alone.
 
 **Implications:**
-- The upstream repository's `.gitignore` must exclude all content paths: `personal/`, `professional/`, `_self/`, `_daily/`, `_conversations/`, `_inbox/`
+- The upstream repository's `.gitignore` must exclude all content paths: `personal/`, `professional/`, `public/`, `_self/`, `_daily/`, `_conversations/`, `_inbox/`
 - Downstream instances (your instance, a community fork) inherit this boundary by default — a new forker cannot accidentally push content to their public GitHub fork
 - Framework improvements flow via branch → PR to the upstream; content paths are never candidates for sync
 
@@ -128,3 +128,14 @@ No contributor has a privileged path to the public repository. The repository ow
 - Direct pushes to `main` are not used for framework improvements — branch → PR is the only path for all contributors including the owner
 - The owner's instance is a downstream fork, structurally identical to any community member's instance
 - The owner validates the contribution workflow by using it themselves — any friction they encounter is assumed to affect all contributors
+
+---
+
+## R10 — Deferred capture
+
+The system must support capture without requiring immediate processing. During a session, items of interest are silently queued to `_inbox/memory-queue.md` (memory candidates) and `_inbox/distill-queue.md` (note candidates) and processed on demand via `/sync-memory` and `/distill`. The queue entry format defined in root `CLAUDE.md` is a standing constraint — entries that deviate from it are not processable.
+
+**Implications:**
+- `_inbox/memory-queue.md` and `_inbox/distill-queue.md` are append-only capture zones during a session
+- Format conformance is required for machine-processability; freeform entries are not valid
+- Queued capture keeps sessions focused — items are logged without branching the current task

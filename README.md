@@ -3,14 +3,16 @@
 > "You do not rise to the level of your goals. You fall to the level of your systems."
 > — James Clear
 
-A PARA-based personal knowledge system built on plain markdown and version control,
-with AI-augmented workflows that keep your notes portable and your content private.
+A platform for building with knowledge, not just storing it — plain markdown and
+version control as the foundation, with an AI that thinks with you across sessions
+and compounds what you learn into better work.
 
-**The recursive part:** the author's own instance is a fork of this repository —
-maintained using the same system it describes. The design decisions, project tracking,
-and improvement workflow all live inside that private instance. What you're reading is
-maintained from the inside: live evidence that the architecture works, not a
-retrospective write-up.
+**The recursive part:** the system and the person using it improve together.
+`second-brain-setup` — the project that designs this second brain — lives as a project
+*inside* it. Every design insight is captured. Every decision is retrievable next session.
+But the deeper loop is human: past reasoning informs present decisions, behavioral
+patterns surface across sessions, knowledge compounds instead of just accumulating.
+The AI is a multiplier — what it multiplies is you.
 
 ## 🔍 The problem
 
@@ -19,32 +21,54 @@ More time configuring templates and rules than writing notes. Plugin-specific ma
 makes files unreadable outside the app. Portability is gone.
 
 AI chat tools (Claude.ai Projects, ChatGPT) have the right scoped context model, but
-three things are missing: you can't version anything — not your instructions, not your
+several things are missing: you can't version anything — not your instructions, not your
 memory, and not the output files the AI produces for you (the documents, drafts, and
 analyses that are the actual value); you can't cross-reference information across
 projects; you have no offline copy of your work.
 
+Insights slip through during sessions — you're deep in a problem, notice something
+worth keeping, but stopping to write a note breaks your flow. And what you do capture
+tends to stay buried: knowledge from three months ago doesn't find its way back when
+it's relevant again. The vault becomes a write-only archive.
+
 ## 💡 The solution
 
 Plain markdown in version control as the durable layer, with an AI coding assistant as
-the intelligence layer operating against structured context.
+the intelligence layer operating against structured context. Four behaviors run
+automatically:
 
-Four files load automatically at session start across two layers:
+**Automatic context** — at session start, your profile, behavioral feedback, and project
+context (current state, open questions, past decisions) load via hook scripts. The AI
+enters each session already knowing who you are and what you're working on — no
+manual copy-paste, no re-explaining.
 
-| Layer   | File                   | Purpose                                              |
-| ------- | ---------------------- | ---------------------------------------------------- |
-| Vault   | `CLAUDE.md`            | Vault-wide conventions, structure, and rules         |
-| User    | `_self/about.md`       | AI-maintained profile — who you are, how you work    |
-| User    | `_self/rules.md`       | Feedback that persists across sessions               |
-| Project | `{project}/CLAUDE.md`  | Instructions and constraints scoped to that project  |
-| Project | `{project}/_memory.md` | AI-maintained running log of decisions and current state |
+**Automatic memory** — at any point in a session, `/sync-memory` persists decisions,
+project state, and behavioral corrections to the right files. What the AI learns in one
+session is available in the next.
 
-Root `CLAUDE.md` is loaded by Claude Code natively. The other four load via hook scripts at session start.
+**Automatic capture** — during sessions, the AI identifies topics worth keeping as
+reference material and queues them as draft note proposals. Run `/distill` to review
+each proposal interactively — refine, confirm, or skip. Notes accumulate because the
+system noticed them, not because you remembered to write them.
 
-The AI enters each session with full context already loaded — no manual copy-paste,
-no re-explaining. This is the same pattern Anthropic's
-[Model Context Protocol](https://modelcontextprotocol.io) formalizes; this system
-implements it directly in the filesystem.
+**Automatic retrieval** — knowledge comes back two ways: relevant notes surface
+automatically via retrieval-augmented generation (RAG), and you can ask the agent
+directly — "what do I know about X?" — and it searches and synthesizes from your
+vault on demand. Passive surfacing and active query, both in the same session.
+
+See `docs/claude-integration.md` and `docs/continue-integration.md` for the full technical detail.
+
+## 🧠 Why "second brain"?
+
+The name comes from a simple idea: an external system that remembers so your brain
+doesn't have to. This system takes that further — comprehensive capture, not a curated
+highlight reel. Everything you think, decide, and learn has a place here.
+
+But storage alone doesn't make it a second brain. A second brain builds. The four
+behaviors above make this real: capture feeds your projects; retrieval brings past
+reasoning back — automatically or on demand; memory means the AI grows with you
+across sessions. Notes aren't the output — they're raw material. What you build with
+them is the point.
 
 ## ✨ What makes this different
 
@@ -64,6 +88,10 @@ captures why things are the way they are — decisions, constraints, what was re
 When reasoning history gets long, it splits into a dedicated `decisions.md`. The design
 rationale for this system is published in `docs/`.
 
+**AI-proposed capture via `/distill`.** During every session, the AI surfaces reference
+material candidates and queues them for review. You decide what stays — the system
+does the noticing.
+
 **Agent-agnostic structure.** Hooks are plain Python scripts and notes are plain
 Markdown. The AI tool is a choice, not load-bearing infrastructure.
 
@@ -72,6 +100,8 @@ Markdown. The AI tool is a choice, not load-bearing infrastructure.
 |                         | Cloud AI (Claude, ChatGPT) | Obsidian standalone | This setup            |
 | ----------------------- | -------------------------- | ------------------- | --------------------- |
 | AI context per session  | built-in                   | —                   | via instruction files |
+| Active capture          | —                          | —                   | ✓ `/distill`          |
+| Active retrieval        | —                          | —                   | ✓ RAG + agent query   |
 | Local files / ownership | —                          | ✓                   | ✓                     |
 | Version control         | —                          | plugin needed       | ✓ git-native          |
 | Output files versioned  | —                          | —                   | ✓                     |
@@ -171,4 +201,4 @@ See `docs/getting-started.md` for the full walkthrough and model recommendations
 - [Continue.dev](https://continue.dev) — open-source AI coding assistant (local-first path)
 - [Ollama](https://ollama.com) — local LLM runtime
 
-Build for the problem in front of you — that's how this one was built.
+The goal was never better notes. It was better work — and a system smart enough to make sure you're not the same person at the end of it.

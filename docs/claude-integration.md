@@ -95,14 +95,33 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 
 ### /sync-memory
 
-**Purpose:** Save current session context to persistent files.
+**Purpose:** Process `_inbox/memory-queue.md` into persistent files.
 
-**What it updates:**
+**How it works:**
+1. Reads `_inbox/memory-queue.md` and groups entries by target file
+2. For each target: reads the current file, consolidates candidates, writes the minimal update using Edit
+3. Removes processed entries from the queue; skipped or unresolved entries remain
+4. **Fallback:** if the queue is missing or empty, falls back to a full retrospective scan of the current conversation
+
+**What it may update:**
 - Project `_memory.md` — current status, key decisions, open questions (fixed sections, updated in-place)
-- `_self/about.md` — new behavioral observations from this session (merged into existing bullets, never appended blindly)
-- Current conversation frontmatter — fills in `context` and `projects` fields if empty
+- `_self/about.md` — new behavioral observations merged into existing bullets, never appended blindly
+- `_self/rules.md` — behavioral corrections only, on explicit signal
 
-**Scope:** Current session only. It doesn't scan prior sessions or rebuild indexes — that's `/housekeeping`.
+**Scope:** Queue-driven. It doesn't scan prior sessions or rebuild indexes — that's `/housekeeping`.
+
+### /distill
+
+**Purpose:** Process `_inbox/distill-queue.md` into durable vault notes.
+
+**How it works:** Interactive, one entry at a time:
+1. Reads the source conversation referenced in each entry
+2. Drafts note content — structured, concise, suitable for `areas/` or `resources/`
+3. Presents the proposed path, draft content, and placement reason for your review
+4. Iterates until you confirm or skip; on confirm, writes the note and updates `dashboard.md`
+5. Removes only confirmed entries from the queue; skipped entries remain
+
+**When to run:** When `_inbox/distill-queue.md` has pending items — typically after a conversation where Claude flagged items worth keeping as reference material.
 
 ### /housekeeping
 
