@@ -1,0 +1,16 @@
+# Infrastructure specification for second-brain.
+# This is the single source of truth for all tooling requirements.
+# Run _scripts/setup.sh (Linux) or _scripts/setup.ps1 (Windows) to enforce.
+
+python:
+  version: "3.14"
+
+vscode:
+  extensions:
+    - ms-python.python
+    - redhat.vscode-yaml
+    - anthropic.claude-code
+    - foam.foam-vscode
+    - esbenp.prettier-vscode
+    - james-yu.latex-workshop
+    - codesmith.markdown-inline-editor-vscode

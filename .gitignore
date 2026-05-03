@@ -1,0 +1,52 @@
+# ── personal ──────────────────────────────────────────────────────────────────
+personal/**
+
+# preserve PARA skeleton
+!personal/projects/
+!personal/projects/.gitkeep
+!personal/areas/
+!personal/areas/.gitkeep
+!personal/resources/
+!personal/resources/.gitkeep
+!personal/archive/
+!personal/archive/.gitkeep
+
+# preserve sbs framework files (including blank starters)
+!personal/projects/second-brain-setup/
+!personal/projects/second-brain-setup/**
+
+# ── professional ──────────────────────────────────────────────────────────────
+professional/**
+
+!professional/projects/
+!professional/projects/.gitkeep
+!professional/areas/
+!professional/areas/.gitkeep
+!professional/resources/
+!professional/resources/.gitkeep
+!professional/archive/
+!professional/archive/.gitkeep
+
+# ── public ────────────────────────────────────────────────────────────────────
+public/**
+
+!public/projects/
+!public/projects/.gitkeep
+!public/areas/
+!public/areas/.gitkeep
+!public/resources/
+!public/resources/.gitkeep
+!public/archive/
+!public/archive/.gitkeep
+
+# ── other content paths ───────────────────────────────────────────────────────
+_self/**
+!_self/.gitkeep
+
+_daily/**
+!_daily/.gitkeep
+
+_conversations/**
+
+_inbox/**
+!_inbox/.gitkeep

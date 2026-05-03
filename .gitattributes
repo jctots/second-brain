@@ -1,0 +1,4 @@
+* text=auto eol=lf
+
+# keep .gitignore instance-owned — never overwrite on upstream merge
+.gitignore merge=ours

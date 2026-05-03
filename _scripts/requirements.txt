@@ -1,0 +1,5 @@
+# Python dependencies for second-brain scripts.
+# Python version is declared in .python-version at repo root.
+# Install: pip install -r _scripts/requirements.txt
+
+# No external dependencies yet — all scripts use stdlib only.

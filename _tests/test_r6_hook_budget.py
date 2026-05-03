@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""R6 — Verify hook-injected file sizes stay within per-file budget limits.
+
+Each hook command has an independent ~10k char cap before Claude Code redirects
+output to a file reference instead of injecting it directly. Safe operating limit
+is set to 9,500 chars per file to maintain headroom.
+
+Exit codes:
+  0 — all files within limit (warnings may be printed for files over 80%)
+  1 — one or more files exceed the hard limit
+"""
+import sys
+from pathlib import Path
+
+EXTENDED_MARKER = "<!-- extended -->"
+LIMIT = 9_500       # hard limit per file — CI fails above this
+WARN_AT = 0.80      # warn when summary reaches 80% of limit
+CONTEXTS = ["personal", "professional", "public"]
+
+
+def summary_length(path: Path) -> int:
+    text = path.read_text(encoding="utf-8")
+    idx = text.find(EXTENDED_MARKER)
+    return len(text[:idx]) if idx != -1 else len(text)
+
+
+def check(label: str, n: int, failures: list, warnings: list) -> None:
+    pct = n / LIMIT
+    if n > LIMIT:
+        print(f"FAIL {label}: {n}/{LIMIT} chars ({pct:.0%})")
+        failures.append(label)
+    elif pct >= WARN_AT:
+        print(f"WARN {label}: {n}/{LIMIT} chars ({pct:.0%} — approaching limit)")
+        warnings.append(label)
+    else:
+        print(f"OK   {label}: {n}/{LIMIT} chars ({pct:.0%})")
+
+
+def main() -> int:
+    repo = Path(__file__).parent.parent
+    failures: list[str] = []
+    warnings: list[str] = []
+
+    for self_file in ("about.md", "rules.md"):
+        f = repo / "_self" / self_file
+        if f.exists():
+            check(f"_self/{self_file}", summary_length(f), failures, warnings)
+        else:
+            print(f"FAIL _self/{self_file}: not found")
+            failures.append(f"_self/{self_file} missing")
+
+    for context in CONTEXTS:
+        projects_dir = repo / context / "projects"
+        if not projects_dir.exists():
+            continue
+        for project_dir in sorted(projects_dir.iterdir()):
+            if not project_dir.is_dir() or project_dir.name.startswith("."):
+                continue
+            for filename in ("CLAUDE.md", "_memory.md"):
+                f = project_dir / filename
+                if f.exists():
+                    label = f"{context}/projects/{project_dir.name}/{filename}"
+                    check(label, summary_length(f), failures, warnings)
+
+    print()
+    if failures:
+        print(f"{len(failures)} file(s) over hard limit — fix before merging:")
+        for f in failures:
+            print(f"  FAIL {f}")
+        return 1
+
+    if warnings:
+        print(f"{len(warnings)} file(s) approaching limit (>{WARN_AT:.0%}) — consider trimming:")
+        for w in warnings:
+            print(f"  WARN {w}")
+
+    if not failures and not warnings:
+        print("All hook budgets within limits.")
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
