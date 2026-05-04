@@ -2,10 +2,6 @@
 
 [[dashboard|⬅️ Dashboard]]
 
-## Who I am
-
-_{Your name and role. A sentence or two — helps the AI calibrate how to assist you. Fill this in before your first session.}_
-
 ## System Overview
 
 This second brain uses the **PARA method** across **three contexts**:
@@ -34,7 +30,7 @@ Each context has the same PARA structure:
 | `_daily/`         | Mixed daily notes — time-indexed, spans all contexts                   |
 | `_inbox/`         | Capture zone — no context yet, process and move out                    |
 | `_scripts/`       | Automation scripts (indexing, hook injection, conversation saving)     |
-| `_self/`          | AI-maintained profile and behavioral reflection about you              |
+| `_self/`          | AI-maintained profile and behavioral reflection about the user         |
 | `_templates/`     | Note templates — each file is self-documenting with usage instructions |
 | `_tests/`         | Tests for scripts and hook budget enforcement                          |
 
@@ -126,9 +122,19 @@ When project names are mentioned in the first message, `_scripts/inject-context.
 - When creating a new note or project file, check `_templates/` first for a relevant template
 - Prefer editing existing notes over creating new ones
 - Flag if a note in `_inbox/` has been sitting there too long without processing
-- During conversations, if something discussed would make a good `areas/` or `resources/` entry: (1) append the entry to `_inbox/distill-queue.md` using Edit, format: `- [topic] — context: "one-line reasoning why this is worth keeping" — proposed: \`path/to/note.md\` — source: [[_conversations/YYYY/MM/filename]]`; (2) notify in one line: `→ added to distill queue: [topic]`. Do not elaborate or branch the conversation. Run `/distill` to process the queue interactively.
-- During conversations, if a memory-worthy item is observed — project state change, decision, profile fact, or behavioral feedback: (1) append the entry to `_inbox/memory-queue.md` using Edit, format: `- [topic] — context: "one-line snippet capturing the key reasoning" — target: \`path/to/memory-file.md\` — source: [[_conversations/YYYY/MM/filename]]`; (2) notify in one line: `→ added to memory queue: [topic]`. Do not elaborate or branch the conversation. Run `/sync-memory` to process the queue.
 - When a new `areas/` or `resources/` file is created, or a new project is created, update `dashboard.md` — add the wikilink to the correct context section and PARA line
+
+## During-conversation captures
+
+These are independent checks — evaluate both for every observation. A single conversation may produce candidates for both queues simultaneously.
+
+**Distill queue** — triggers when something has lasting reference value beyond this project: technology analysis, tool comparisons, design patterns, architectural concepts, mental models. Does not trigger for: project-specific decisions (→ `decisions.md`), ephemeral task details, topics already covered in an existing note (duplicate check is `/distill`'s job, not the queue's).
+(1) Append to `_inbox/distill-queue.md` using Edit, format: `- [topic] — context: "one-line reasoning why this is worth keeping" — proposed: \`path/to/note.md\` — source: [[_conversations/YYYY/MM/filename]]`;
+(2) notify in one line: `→ added to distill queue: [topic]`. Do not elaborate or branch the conversation.
+
+**Memory queue** — triggers when a memory-worthy item is observed: project state change, architectural decision, profile fact, behavioral feedback.
+(1) Append to `_inbox/memory-queue.md` using Edit, format: `- [topic] — context: "one-line snippet capturing the key reasoning" — target: \`path/to/memory-file.md\` — source: [[_conversations/YYYY/MM/filename]]`;
+(2) notify in one line: `→ added to memory queue: [topic]`. Do not elaborate or branch the conversation.
 
 ## Token and cost awareness
 
@@ -139,19 +145,6 @@ When project names are mentioned in the first message, `_scripts/inject-context.
 
 ## Hook injection budget
 
-Each session, four hooks inject content into the context window — one per file, each with an independent budget. Claude Code caps each hook command's output at ~10,000 characters; beyond that, output is redirected to a file reference instead of injected directly.
+Each injected file (`_self/about.md`, `_self/rules.md`, project `CLAUDE.md`, project `_memory.md`) has a 9,500-char hard limit; warn at 7,600 (80%). `/housekeeping` checks these. `/sync-memory` flags after each write.
 
-| Hook                       | File                  | Warn at     | Hard limit  |
-| -------------------------- | --------------------- | ----------- | ----------- |
-| `inject-profile.py`        | `_self/about.md`      | 7,600 chars | 9,500 chars |
-| `inject-rules.py`       | `_self/rules.md`   | 7,600 chars | 9,500 chars |
-| `inject-context-claude.py` | project `CLAUDE.md`   | 7,600 chars | 9,500 chars |
-| `inject-context-memory.py` | project `_memory.md`  | 7,600 chars | 9,500 chars |
-
-`_tests/test_r6_hook_budget.py` enforces these limits: warning at 80%, CI failure at 100%.
-
-### Extended sections
-
-Project `_memory.md` files may contain an `<!-- extended -->` marker. The inject scripts strip everything at and below this marker before printing — **only content above the marker is injected and counts toward the budget**. Content below is preserved for on-demand reference.
-
-**When writing or updating `_memory.md`**, only measure the summary section (above `<!-- extended -->`). `/sync-memory` may append demoted items to the extended section, or delete stale items outright — both are valid. Always use Edit (not Write) on files with the marker to avoid overwriting the extended section.
+**Extended section rule:** Files with `<!-- extended -->` must always be edited with Edit, never Write — Write overwrites the extended section. Only content above the marker counts toward the budget. `/sync-memory` may demote items to the extended section or delete stale ones — both are valid.

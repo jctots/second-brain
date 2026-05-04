@@ -63,6 +63,7 @@ The vault is comprehensive by design — personal, professional, health, financi
 **Implications:**
 - Cloud AI (e.g. Claude Code) is accepted for complex reasoning tasks where exposure is a conscious tradeoff
 - A local LLM tool (e.g. Ollama) is the preferred path for sensitive or routine tasks — see roadmap
+- A private cloud path (open-weights model on user-controlled infrastructure, encrypted API transport) bridges cloud SaaS and local — no client-side hardware required, inference stays within user-controlled infrastructure. Trust model: the user controls where inference happens, not whether inference is encrypted (the model sees plaintext during processing).
 - The upstream repository must never contain private content; this is enforced structurally by `.gitignore` (see R8), not by manual curation
 
 ---

@@ -13,6 +13,15 @@ created: 2026-04-24
 
 ---
 
+## D21 — 2026-05-04 — Three deployment tiers: SaaS, private cloud, self-hosted
+
+**Decision:** The deployment model is structured as three additive tiers: Tier 1 (SaaS — GitHub + cloud AI), Tier 2 (private cloud — user-controlled VPS with Gitea + Ollama/vLLM via HTTPS), Tier 3 (self-hosted — homelab with Gitea + local Ollama). Tiers are additive: SaaS options remain available at all tiers; higher tiers add private paths without removing cloud options.
+**Why:** The original two-tier model (D18) skipped the case where users want infrastructure control but lack local GPU hardware. A VPS running Ollama bridges this gap — user controls where inference runs without requiring client-side hardware. The trust boundary is user-controlled inference environment, not whether inference is encrypted (the model sees plaintext during processing regardless). (R4)
+**Alternatives considered:** Keep two tiers with VPS as a Tier 2 variant — rejected; the hardware distinction (cloud vs local) is meaningful for the setup path and warrants explicit tier separation. "Encrypted inference" framing — rejected; open-weights models always see plaintext during processing; the relevant guarantee is infrastructure control, not transport encryption.
+**Supersedes:** D18 (two-tier framing). Note: "Tier 2" in D16 referred to what is now Tier 3 (self-hosted).
+
+---
+
 ## D20 — 2026-05-03 — `.gitignore merge=ours` flows to all downstream forks
 
 **Decision:** Added `.gitignore merge=ours` to the upstream repository's `.gitattributes`. Since `.gitattributes` flows downstream on first merge, all forks automatically inherit `.gitignore` protection before they need it.
@@ -29,7 +38,7 @@ created: 2026-04-24
 
 ---
 
-## D18 — 2026-05-03 — Tier 1/Tier 2 deployment model documented in public setup guides
+## D18 — 2026-05-03 — Tier 1/Tier 2 deployment model documented in public setup guides *(superseded by D21)*
 
 **Decision:** Named and documented two deployment tiers in `docs/getting-started.md`. Tier 1: GitHub fork + cloud AI. Tier 2: Gitea + Ollama + local AI. The README keeps prose framing; tier labels appear in setup docs where structure matters.
 **Why:** The two-path framing needed a clear upgrade path story. Tier labels give readers a mental model for what they're adding and why, without forcing infrastructure decisions upfront. (R4)
@@ -45,7 +54,7 @@ created: 2026-04-24
 
 ---
 
-## D16 — 2026-04-30 — Continue.dev + Ollama chosen as Tier 2 AI tool; slash command parity as design goal
+## D16 — 2026-04-30 — Continue.dev + Ollama chosen as local-first AI tool; slash command parity as design goal *(note: "Tier 2" in this entry = Tier 3 in the three-tier model, see D21)*
 
 **Decision:** Continue.dev is the local-first AI path alongside Claude Code. Every Claude Code slash command (`.claude/commands/`) has a Continue.dev equivalent (`.continue/prompts/`). Slash command parity is the primary reason Continue.dev was chosen over Cline.
 **Why:** A second brain captures sensitive content — the local-first path must not degrade the workflow relative to the cloud path. Cline has no native slash command equivalent; workflows would degrade to conversational prompts. Continue.dev's slash command support enables identical command invocation across both paths. (R4)

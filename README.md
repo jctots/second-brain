@@ -7,12 +7,7 @@ A platform for building with knowledge, not just storing it — plain markdown a
 version control as the foundation, with an AI that thinks with you across sessions
 and compounds what you learn into better work.
 
-**The recursive part:** the system and the person using it improve together.
-`second-brain-setup` — the project that designs this second brain — lives as a project
-*inside* it. Every design insight is captured. Every decision is retrievable next session.
-But the deeper loop is human: past reasoning informs present decisions, behavioral
-patterns surface across sessions, knowledge compounds instead of just accumulating.
-The AI is a multiplier — what it multiplies is you.
+**The recursive part:** the system and the person using it improve together. `second-brain-setup` — the project that designs this second brain — lives as a meta project inside it. It doesn't just support self-improvement; it contains the mechanism of its own improvement — the loop closes on itself. The deeper loop is human: past reasoning informs present decisions, behavioral patterns surface across sessions, knowledge compounds instead of just accumulating. The AI is a multiplier, through the systems you build — but what it multiplies is you.
 
 ## 🔍 The problem
 
@@ -201,4 +196,4 @@ See `docs/getting-started.md` for the full walkthrough and model recommendations
 - [Continue.dev](https://continue.dev) — open-source AI coding assistant (local-first path)
 - [Ollama](https://ollama.com) — local LLM runtime
 
-The goal was never better notes. It was better work — and a system smart enough to make sure you're not the same person at the end of it.
+The goal was never better notes. It was better work — and a system smart enough to make you better at what you do.
