@@ -77,10 +77,12 @@ A personal knowledge management system built on a git-backed Markdown vault. Thr
 └──┬─────────────┬─────────────┬─────────────┬────────┘
    │             │             │             │
 VSCode/Foam   Obsidian    Claude Code  Continue.dev
-(editing)   (reading/     (cloud AI)  (local-first AI)
-             mobile)                        │
-                                         Ollama
-                                       (local LLM)
+(editing/   (reading/    (SaaS AI)   (local-first AI)
+ reading)    mobile)                       │
+                                  ┌────────┴────────┐
+                           Private Ollama/        Ollama
+                           vLLM on VPS         (local LLM)
+                           (private cloud)
    │ (git push)
    ├─────────────────────────────► Gitea Actions
    │                               (content CI: indexing, tests)
@@ -475,7 +477,7 @@ Continue.dev is configured via `~/.continue/config.json`. Add Ollama as a provid
 }
 ```
 
-For Tier 2 (self-hosted), Ollama runs as a Docker container — use its container address instead of `localhost`. See `docs/self-hosted-setup.md`.
+For Tier 2 (private cloud), replace `localhost` with the VPS address and add HTTPS + API key auth. For Tier 3 (self-hosted), Ollama runs as a Docker container — use its container address instead of `localhost`. See `docs/self-hosted-setup.md`.
 
 ---
 
@@ -541,7 +543,7 @@ Tests are deterministic pass/fail scripts — stdlib Python only (R2), no Claude
 | R1 — Obsidian + Foam | Static markdown, shortest-unique-path wikilinks, no plugin-dependent features |
 | R2 — Platform portability | Python stdlib scripts, pathlib, no OS-specific calls |
 | R3 — Reproducibility | `infra.yaml` + setup scripts; CI uses direct `run:` steps |
-| R4 — Privacy | Claude Code accepted consciously; local-first path available via Continue.dev + Ollama (see `docs/continue-integration.md`) |
+| R4 — Privacy | Three inference paths: cloud SaaS (conscious tradeoff), private cloud (Continue.dev + remote Ollama/vLLM on VPS), local (Continue.dev + local Ollama, air-gapped) |
 | R5 — No always-on processes | CI for scheduled work; no background daemons |
 | R6 — Hook budget | Four inject scripts, each with its own independent 10,000-char budget |
 | R7 — Static generated files | CI-owned indexes; no Dataview or plugin-dependent queries |
@@ -573,33 +575,35 @@ Plus: second-brain-setup SE docs (`personal/projects/second-brain-setup/` exclud
 
 ### Deployment tiers
 
-The system supports two deployment tiers. Both use the same framework from the upstream repository. The difference is which private infrastructure is present.
+The system supports three deployment tiers, all built from the same upstream framework.
 
-**Tier 1 — Evaluation**
+> GitHub (framework CI) and cloud SaaS AI remain available at all tiers — Tier 2 and Tier 3 add private paths, they don't remove the SaaS options.
 
-| Component | Details |
-|---|---|
-| Framework | GitHub fork of the upstream |
-| AI | Cloud (Claude Code or equivalent) |
-| Content hosting | GitHub private fork |
-| CI | GitHub Actions (framework tests only) |
-| Private CI | None |
+| Tier | Name | Git hosting | AI inference | Hardware required |
+|---|---|---|---|---|
+| 1 | SaaS | GitHub | Cloud SaaS (e.g., Claude Code) | None |
+| 2 | Private cloud | Gitea on VPS | Ollama/vLLM on VPS (HTTPS + API key) | None (VPS subscription) |
+| 3 | Self-hosted | Gitea on homelab | Ollama on local machine | Homelab + GPU |
+
+**Tier 1 — SaaS**
+
+Framework: GitHub fork of the upstream. Content hosting: GitHub private fork. CI: GitHub Actions (framework tests only).
 
 Privacy caveats: content is visible to cloud AI; content lives on GitHub. Not suitable for comprehensive capture of sensitive personal content. Use for: evaluating the framework, learning the design, contributing to the upstream.
 
-**Tier 2 — Full private setup**
+**Tier 2 — Private cloud**
 
-| Component | Details |
-|---|---|
-| Framework | GitHub fork of the upstream |
-| AI | Continue.dev + Ollama (local — no data leaves machine) |
-| Content hosting | Self-hosted Gitea |
-| CI | Gitea Actions (content-aware: indexing, tests) + GitHub Actions (framework tests) |
-| Private CI | Yes — conversation indexing, budget tests on private content |
+Framework: GitHub fork of the upstream (framework CI). Content hosting: Gitea on VPS. AI: Continue.dev configured with a remote Ollama or vLLM endpoint (HTTPS + API key) — no local GPU required. CI: Gitea Actions (content-aware: indexing, tests) + GitHub Actions (framework tests).
 
-Privacy: content never leaves local infrastructure. Full feature set. Use for: a real second brain with comprehensive capture of personal, professional, and sensitive content.
+Privacy: content stays on user-controlled infrastructure; no local hardware beyond a laptop required.
 
-The Tier 1 → Tier 2 upgrade path is documented in `docs/getting-started.md`.
+**Tier 3 — Self-hosted**
+
+Framework: GitHub fork of the upstream (framework CI). Content hosting: Gitea on homelab. AI: Continue.dev + local Ollama (no data leaves the machine). CI: Gitea Actions (content-aware: indexing, tests) + GitHub Actions (framework tests).
+
+Privacy: content never leaves local infrastructure. Full feature set, maximum sovereignty. Use for: a real second brain with comprehensive capture of personal, professional, and sensitive content.
+
+The upgrade path (Tier 1 → Tier 2 → Tier 3) is documented in `docs/getting-started.md`.
 
 ### Contribution workflow
 

@@ -41,6 +41,11 @@ def main() -> int:
     failures: list[str] = []
     warnings: list[str] = []
 
+    # Optional filter: python test_r6_hook_budget.py personal/projects/my-project
+    # Matches project path suffix; "all" or omitted runs everything.
+    filter_arg = sys.argv[1] if len(sys.argv) > 1 else None
+    project_filter = None if (not filter_arg or filter_arg == "all") else filter_arg.strip("/")
+
     for self_file in ("about.md", "rules.md"):
         f = repo / "_self" / self_file
         if f.exists():
@@ -56,11 +61,13 @@ def main() -> int:
         for project_dir in sorted(projects_dir.iterdir()):
             if not project_dir.is_dir() or project_dir.name.startswith("."):
                 continue
+            label_prefix = f"{context}/projects/{project_dir.name}"
+            if project_filter and not label_prefix.endswith(project_filter.split("/")[-1]):
+                continue
             for filename in ("CLAUDE.md", "_memory.md"):
                 f = project_dir / filename
                 if f.exists():
-                    label = f"{context}/projects/{project_dir.name}/{filename}"
-                    check(label, summary_length(f), failures, warnings)
+                    check(f"{label_prefix}/{filename}", summary_length(f), failures, warnings)
 
     print()
     if failures:
