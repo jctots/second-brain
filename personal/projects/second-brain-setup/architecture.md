@@ -33,7 +33,6 @@ created: 2026-04-29
   - [Foam / VSCode](#foam--vscode)
   - [Obsidian](#obsidian-desktop--mobile)
   - [Claude Code](#claude-code)
-  - [Continue.dev](#continuedev)
   - [Gitea Actions](#gitea-actions-ci)
   - [\_scripts/](#_scripts-shared-scripts)
 - [Data flows](#data-flows)
@@ -48,10 +47,12 @@ created: 2026-04-29
   - [Auto-memory](#auto-memory)
   - [Slash commands](#slash-commands)
   - [Automation reliability summary](#automation-reliability-summary)
-- [Continue.dev interface](#continuedev-interface)
+- [LiteLLM gateway interface](#litellm-gateway-interface)
+  - [What it is](#what-it-is)
   - [Configuration](#configuration)
-  - [Context loading](#context-loading)
-  - [Slash commands (Continue.dev)](#slash-commands-continuedev)
+  - [Tier 2 — Private cloud](#tier-2--private-cloud-1)
+  - [Tier 3 — Self-hosted](#tier-3--self-hosted-1)
+  - [Feature degradation](#feature-degradation)
 - [Verification](#verification)
 - [Key constraints satisfied](#key-constraints-satisfied)
 - [Artifact ecosystem](#artifact-ecosystem)
@@ -74,15 +75,18 @@ A personal knowledge management system built on a git-backed Markdown vault. Thr
 │  PARA × context structure                           │
 │  personal/ · professional/ · public/                │
 │  _inbox/ · _daily/ · _conversations/ · _self/       │
-└──┬─────────────┬─────────────┬─────────────┬────────┘
-   │             │             │             │
-VSCode/Foam   Obsidian    Claude Code  Continue.dev
-(editing/   (reading/    (SaaS AI)   (local-first AI)
- reading)    mobile)                       │
-                                  ┌────────┴────────┐
-                           Private Ollama/        Ollama
-                           vLLM on VPS         (local LLM)
-                           (private cloud)
+└──┬─────────────┬─────────────┬────────────────────────┘
+   │             │             │
+VSCode/Foam   Obsidian    Claude Code (AI agent)
+(editing/   (reading/         │
+ reading)    mobile)    ┌─────┴──────────────────────┐
+                   Anthropic API         LiteLLM gateway
+                   (cloud SaaS)         (Tier 2/3)
+                                              │
+                                  ┌───────────┴──────────┐
+                            Remote Ollama/          Local Ollama
+                            vLLM on VPS             (homelab)
+                            (Tier 2)                (Tier 3)
    │ (git push)
    ├─────────────────────────────► Gitea Actions
    │                               (content CI: indexing, tests)
@@ -150,28 +154,6 @@ UserPromptSubmit fires
 
 ---
 
-### Continue.dev
-
-Local-first AI reasoning layer. Uses Ollama to run LLMs locally — no data leaves the machine. Parallel path to Claude Code; both can be active simultaneously. The line between them is drawn by content sensitivity.
-
-**Owns:** session reasoning on sensitive content, memory management, slash command execution
-**Consumes:** vault via filesystem tools; context via `/load-context` slash command
-**Does not own:** the vault (it assists, not governs); hook execution (Continue.dev has no hook system)
-
-**Context loading at session start (user-triggered):**
-
-```
-User runs /load-context my-project
-  → loads CLAUDE.md (root)
-  → loads _self/about.md
-  → loads _self/rules.md
-  → loads project CLAUDE.md + _memory.md
-```
-
-Context is not injected automatically — the user runs `/load-context` at the start of each session. This is the key behavioral difference from Claude Code's hook-guaranteed injection.
-
----
-
 ### Gitea Actions (CI)
 
 Deterministic automation that runs on push. Handles derived/generated artifacts that don't require judgment.
@@ -194,8 +176,8 @@ Python scripts callable both from Claude Code hooks and Gitea Actions CI. No ext
 | `inject-context-memory.py` | Hook (`UserPromptSubmit`) | Detect project, inject project `_memory.md` |
 | `save-conversation.py` | Hook (`Stop`, `SessionEnd`) | Save session transcript to `_conversations/` |
 | `index-conversations.py` | CI | Regenerate `_conversations/index.md` |
-| `update-project-indexes.py` | `/housekeeping`, `/sync-memory` | Update `## files` + `## relevant conversations` in project index.md |
-| `commit.py` | `/commit` command | Stage → commit → pull rebase → push |
+| `update-project-indexes.py` | `/maintain`, `/remember` | Update `## files` + `## relevant conversations` in project index.md |
+| `commit.py` | `/sync` (commit option) | Stage → commit → pull rebase → push |
 
 ---
 
@@ -224,34 +206,54 @@ User pushes to Gitea
       → CI commits result back to main
 ```
 
-### Memory sync (user-triggered `/sync-memory`)
+### Queue model
+
+Two inboxes capture candidates during and after conversations:
+
+- `_inbox/distill-queue.md` — topics worth turning into durable `resources/` notes
+- `_inbox/memory-queue.md` — project state changes, decisions, profile facts, behavioral feedback
+
+Each entry carries a `context:` snippet sufficient to act on without re-reading the source conversation.
+
+**Writers** (add to queues, never consume):
+- Root `CLAUDE.md` instructions — mid-conversation, opportunistic
+- `/remember` — retrospective scan of the current conversation at session end
+- `/maintain` — retrospective scan of unprocessed conversations during vault audit
+
+**Consumers** (process and remove from queues):
+- `/remember` — processes memory queue entries from the current conversation only
+- `/distill` — processes memory queue entries from all other conversations; processes distill queue interactively
+
+### `/remember` (user-triggered, end of session)
 
 ```
-User runs /sync-memory
-  → reads _inbox/memory-queue.md
-      → groups entries by target file
-      → for each target: reads file, consolidates candidates, drafts minimal update
-      → writes each update using Edit (never Write)
+User runs /remember
+  → scans current conversation for missed distill candidates → appends to distill queue
+  → scans current conversation for missed memory candidates → appends to memory queue
+  → reads memory queue, filters to current conversation entries only
+      → groups by target file, consolidates using context snippets
+      → writes updates using Edit (never Write)
       → removes processed entries from queue
-  → if queue was empty: falls back to retrospective scan of current conversation
-  → updates _self/about.md if new profile facts observed
-  → updates _self/rules.md if behavioral correction warranted
+  → updates _self/about.md / _self/rules.md if new facts or corrections observed
   → prepends to decisions.md if an architectural decision was made
+  → runs budget check if any file was written
 ```
 
-### Distill (user-triggered `/distill`)
+### `/distill` (user-triggered, periodic)
 
 ```
 User runs /distill
+  → reads memory queue for entries from other conversations (not current session)
+      → processes and removes them (no conversation re-reads unless snippet insufficient)
   → reads _inbox/distill-queue.md
   → for each pending entry:
       → reads source conversation file
-      → drafts note content (structured, concise — areas/ or resources/)
+      → drafts note content (structured, concise — resources/)
       → presents: proposed path + draft content + placement reason
       → iterates with user until confirmed or skipped
       → on confirm: writes note (Edit if exists, Write if new); updates dashboard.md
       → on skip: leaves entry in queue unchanged
-  → removes only confirmed entries from queue
+  → removes only confirmed distill entries from queue
 ```
 
 ---
@@ -426,14 +428,13 @@ Location: `.claude/commands/`
 
 | Command | When to use |
 |---|---|
-| `/sync-memory` | Process `_inbox/memory-queue.md` — run when queue has items or at session end |
-| `/distill` | Process `_inbox/distill-queue.md` — interactive, one entry at a time |
-| `/housekeeping` | Periodic maintenance — classify conversations, check budgets, regenerate indexes |
-| `/commit` | Stage and commit — Claude proposes commit message, user confirms |
-| `/audit` | Scan all active projects for structural gaps — report only |
-| `/review-memory` | Human audit of AI-maintained memory files — report only |
+| `/remember` | End of session — retrospective scan + process memory queue for current conversation |
+| `/distill` | Periodic — process orphaned memory queue entries + distill queue into `resources/` notes |
+| `/maintain` | Periodic vault audit — budgets, structure, PARA lifecycle, inbox aging, queue retrospective |
+| `/sync` | Git operations — commit staged work, check or pull framework updates |
+| `/contribute` | Contribute framework improvements to upstream GitHub |
 
-Adding a new command: create `.claude/commands/{name}.md`. No registration required.
+Adding a new command: create `.claude/commands/{name}.md`. No registration required. Avoid names that conflict with built-in Claude Code skills — built-ins take precedence on name collision.
 
 ---
 
@@ -449,78 +450,71 @@ Adding a new command: create `.claude/commands/{name}.md`. No registration requi
 | Extended context footer signal | Inject scripts | Guaranteed when marker present |
 | Regenerate conversation + project indexes | Gitea Actions | Guaranteed on push to main |
 | Infer context and confirm with user | CLAUDE.md instruction | Unreliable |
-| `/sync-memory` trigger | User-invoked slash command | Reliable — user-triggered |
-| `/distill` trigger | User-invoked slash command | Reliable — user-triggered |
+| `/remember` trigger | User-invoked slash command | Reliable — user-triggered; session-scoped |
+| `/distill` trigger | User-invoked slash command | Reliable — user-triggered; cross-session |
+| `/maintain` trigger | User-invoked slash command | Reliable — user-triggered; periodic |
 
 ---
 
-## Continue.dev interface
+## LiteLLM gateway interface
 
-How Continue.dev integrates with this repo — configuration, context loading, and slash commands.
+How Claude Code connects to a local or private-cloud Ollama instance — the mechanism that enables Tier 2 and Tier 3 without switching tools or losing the harness.
+
+---
+
+### What it is
+
+LiteLLM is a proxy that translates Claude Code's Anthropic Messages API format (`/v1/messages`) into the OpenAI-compatible format that Ollama exposes. Claude Code's harness — hooks, slash commands, conversation saving, context injection — continues to work unchanged. The only difference is where inference happens.
 
 ---
 
 ### Configuration
 
-Continue.dev is configured via `~/.continue/config.json`. Add Ollama as a provider:
+Two environment variables redirect Claude Code to the gateway:
 
-```json
-{
-  "models": [
-    {
-      "title": "Qwen 2.5 7B (local)",
-      "provider": "ollama",
-      "model": "qwen2.5:7b",
-      "apiBase": "http://localhost:11434"
-    }
-  ]
-}
+```bash
+export ANTHROPIC_BASE_URL=http://localhost:4000  # LiteLLM endpoint
+export ANTHROPIC_AUTH_TOKEN=sk-your-litellm-key
 ```
 
-For Tier 2 (private cloud), replace `localhost` with the VPS address and add HTTPS + API key auth. For Tier 3 (self-hosted), Ollama runs as a Docker container — use its container address instead of `localhost`. See `docs/self-hosted-setup.md`.
+Unset both (or remove from the shell profile) to return to the Anthropic API. The harness is model-agnostic and unaffected by this switch.
 
 ---
 
-### Context loading
+### Tier 2 — Private cloud
 
-Continue.dev has no hook system. Context is loaded manually at session start via the `/load-context` slash command:
+LiteLLM runs on the same VPS as Ollama or vLLM. Set `ANTHROPIC_BASE_URL` to the VPS address with HTTPS and an API key. No local GPU required; inference stays on user-controlled infrastructure.
 
 ```
-/load-context my-project
+Claude Code → HTTPS → LiteLLM (VPS) → Ollama/vLLM (VPS)
 ```
-
-This loads root `CLAUDE.md`, `_self/about.md`, `_self/rules.md`, and the matched project's `CLAUDE.md` + `_memory.md` — the same files the four Claude Code hooks inject automatically.
-
-**Reliability comparison:**
-
-| Behavior | Claude Code | Continue.dev |
-|---|---|---|
-| Load `_self/about.md` | Hook — guaranteed first turn | `/load-context` — user-triggered |
-| Load `_self/rules.md` | Hook — guaranteed first turn | `/load-context` — user-triggered |
-| Load project `CLAUDE.md` | Hook — if project name in first message | `/load-context` — user-triggered |
-| Load project `_memory.md` | Hook — if project name in first message | `/load-context` — user-triggered |
-
-Individual files can also be loaded using Continue.dev's `@file` mentions.
-
-**Context budget:** determined by the Ollama model in use — typically 32K–128K tokens. The `<!-- extended -->` marker in `_memory.md` still applies: keep summary sections above it to avoid loading unnecessary detail.
 
 ---
 
-### Slash commands (Continue.dev)
+### Tier 3 — Self-hosted
 
-Location: `.continue/prompts/`
+LiteLLM and Ollama run on user-owned hardware (same machine or private network). Set `ANTHROPIC_BASE_URL` to the address of the LiteLLM instance. No data leaves user-owned infrastructure.
 
-Every Claude Code slash command has a Continue.dev equivalent. The invocation is the same in both tools — type `/command-name` in the chat panel.
+```
+Claude Code → LiteLLM (user-owned hardware) → Ollama (user-owned hardware)
+```
 
-| Command | Claude Code | Continue.dev |
+---
+
+### Feature degradation
+
+Features that depend on Anthropic-specific model capabilities degrade when routing through a local model:
+
+| Feature | Anthropic API | Local model via LiteLLM |
 |---|---|---|
-| `/sync-memory` | `.claude/commands/sync-memory.md` | `.continue/prompts/sync-memory.md` |
-| `/commit` | `.claude/commands/commit.md` | `.continue/prompts/commit.md` |
-| `/housekeeping` | `.claude/commands/housekeeping.md` | `.continue/prompts/housekeeping.md` |
-| `/audit` | `.claude/commands/audit.md` | `.continue/prompts/audit.md` |
-| `/review-memory` | `.claude/commands/review-memory.md` | `.continue/prompts/review-memory.md` |
+| Agentic tool use (multi-step edits) | Full | Degraded — depends on model quality |
+| Extended thinking / effort levels | Available | Not available |
+| Prompt caching | Available | Not available |
+| Hooks + slash commands | Available | Available — harness is model-agnostic |
+| Conversation saving | Available | Available — harness is model-agnostic |
+| Context injection | Available | Available — harness is model-agnostic |
 
-Adding a new command: create both `.claude/commands/{name}.md` and `.continue/prompts/{name}.md` to keep both paths in parity.
+Use the local model path for sensitive-content queries and simple tasks. Complex agentic work benefits from the Anthropic API.
 
 ---
 
@@ -543,7 +537,7 @@ Tests are deterministic pass/fail scripts — stdlib Python only (R2), no Claude
 | R1 — Obsidian + Foam | Static markdown, shortest-unique-path wikilinks, no plugin-dependent features |
 | R2 — Platform portability | Python stdlib scripts, pathlib, no OS-specific calls |
 | R3 — Reproducibility | `infra.yaml` + setup scripts; CI uses direct `run:` steps |
-| R4 — Privacy | Three inference paths: cloud SaaS (conscious tradeoff), private cloud (Continue.dev + remote Ollama/vLLM on VPS), local (Continue.dev + local Ollama, air-gapped) |
+| R4 — Privacy | Three inference paths: cloud SaaS (Anthropic API, conscious tradeoff), private cloud (Claude Code + LiteLLM gateway → Ollama/vLLM on rented VPS), self-hosted (Claude Code + LiteLLM gateway → Ollama on user-owned hardware, no data leaves user infrastructure) |
 | R5 — No always-on processes | CI for scheduled work; no background daemons |
 | R6 — Hook budget | Four inject scripts, each with its own independent 10,000-char budget |
 | R7 — Static generated files | CI-owned indexes; no Dataview or plugin-dependent queries |
@@ -583,7 +577,7 @@ The system supports three deployment tiers, all built from the same upstream fra
 |---|---|---|---|---|
 | 1 | SaaS | GitHub | Cloud SaaS (e.g., Claude Code) | None |
 | 2 | Private cloud | Gitea on VPS | Ollama/vLLM on VPS (HTTPS + API key) | None (VPS subscription) |
-| 3 | Self-hosted | Gitea on homelab | Ollama on local machine | Homelab + GPU |
+| 3 | Self-hosted | Gitea on user-owned hardware | Ollama on user-owned hardware | Own hardware + GPU |
 
 **Tier 1 — SaaS**
 
@@ -593,15 +587,15 @@ Privacy caveats: content is visible to cloud AI; content lives on GitHub. Not su
 
 **Tier 2 — Private cloud**
 
-Framework: GitHub fork of the upstream (framework CI). Content hosting: Gitea on VPS. AI: Continue.dev configured with a remote Ollama or vLLM endpoint (HTTPS + API key) — no local GPU required. CI: Gitea Actions (content-aware: indexing, tests) + GitHub Actions (framework tests).
+Framework: GitHub fork of the upstream (framework CI). Content hosting: Gitea on VPS. AI: Claude Code via LiteLLM gateway pointing to a remote Ollama or vLLM endpoint (HTTPS + API key) — no local GPU required. CI: Gitea Actions (content-aware: indexing, tests) + GitHub Actions (framework tests).
 
 Privacy: content stays on user-controlled infrastructure; no local hardware beyond a laptop required.
 
 **Tier 3 — Self-hosted**
 
-Framework: GitHub fork of the upstream (framework CI). Content hosting: Gitea on homelab. AI: Continue.dev + local Ollama (no data leaves the machine). CI: Gitea Actions (content-aware: indexing, tests) + GitHub Actions (framework tests).
+Framework: GitHub fork of the upstream (framework CI). Content hosting: Gitea on user-owned hardware. AI: Claude Code via LiteLLM pointing to Ollama — both running on user-owned hardware (same machine or private network). No data leaves user-owned infrastructure. CI: Gitea Actions (content-aware: indexing, tests) + GitHub Actions (framework tests).
 
-Privacy: content never leaves local infrastructure. Full feature set, maximum sovereignty. Use for: a real second brain with comprehensive capture of personal, professional, and sensitive content.
+Privacy: content never leaves user-owned infrastructure. Full feature set, maximum sovereignty. Use for: a real second brain with comprehensive capture of personal, professional, and sensitive content.
 
 The upgrade path (Tier 1 → Tier 2 → Tier 3) is documented in `docs/getting-started.md`.
 

@@ -1,8 +1,10 @@
 # 🤖 Claude Code Integration
 
-> Session context is sent to Anthropic's API. Read [PRIVACY.md](../PRIVACY.md) before using Claude Code with sensitive content. For the local-first path, see [continue-integration.md](continue-integration.md).
-
 How Claude Code fits into this second brain — hook architecture, slash commands, the context injection budget, and where judgment replaces automation.
+
+Claude Code is the AI interface at every deployment tier. For Tier 2/3 (private inference), set `ANTHROPIC_BASE_URL` to point at a LiteLLM gateway — the hooks and slash commands described here work identically regardless of where inference happens. See [private-cloud-setup.md](private-cloud-setup.md) and [self-hosted-setup.md](self-hosted-setup.md).
+
+> For Tier 1 (Anthropic API): session context is sent to Anthropic's servers. Read [PRIVACY.md](../PRIVACY.md) before using Claude Code with sensitive content.
 
 
 ## 🪝 Hook architecture
@@ -82,76 +84,52 @@ No announcement = hook miss. This is the passive health check — you don't have
 
 Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-name` in a Claude Code session. Tab-completion lists available commands.
 
-### /commit
+### /remember
 
-**Purpose:** Draft a commit message from the staged diff and run git.
-
-**How it works:**
-1. Claude reads `git diff --cached` and proposes a commit message in the conversation
-2. You confirm or edit the message
-3. Claude calls `python _scripts/commit.py "your message"`, which handles `git pull --rebase` → `git commit` → `git push`
-
-**Why split:** Message drafting requires judgment (what matters in this diff, what's the intent). Git mechanics are deterministic. Keeping AI in-conversation avoids spawning a cold-context agent just to run shell commands.
-
-### /sync-memory
-
-**Purpose:** Process `_inbox/memory-queue.md` into persistent files.
+**Purpose:** End-of-session retrospective — scan the current conversation for missed candidates, then process the memory queue.
 
 **How it works:**
-1. Reads `_inbox/memory-queue.md` and groups entries by target file
-2. For each target: reads the current file, consolidates candidates, writes the minimal update using Edit
-3. Removes processed entries from the queue; skipped or unresolved entries remain
-4. **Fallback:** if the queue is missing or empty, falls back to a full retrospective scan of the current conversation
+1. Scans the current conversation for missed distill candidates → appends to `_inbox/distill-queue.md`
+2. Scans for missed memory candidates → appends to `_inbox/memory-queue.md`
+3. Reads the memory queue, filters to current-conversation entries, groups by target file
+4. Writes the minimal update to each target using Edit (never Write — preserves extended sections)
+5. Removes processed entries; runs a budget check on any file written
 
-**What it may update:**
-- Project `_memory.md` — current status, key decisions, open questions (fixed sections, updated in-place)
-- `_self/about.md` — new behavioral observations merged into existing bullets, never appended blindly
-- `_self/rules.md` — behavioral corrections only, on explicit signal
-
-**Scope:** Queue-driven. It doesn't scan prior sessions or rebuild indexes — that's `/housekeeping`.
+**When to run:** At the end of any session with significant decisions or state changes.
 
 ### /distill
 
-**Purpose:** Process `_inbox/distill-queue.md` into durable vault notes.
+**Purpose:** Process pending queues into durable vault notes.
 
-**How it works:** Interactive, one entry at a time:
-1. Reads the source conversation referenced in each entry
-2. Drafts note content — structured, concise, suitable for `areas/` or `resources/`
-3. Presents the proposed path, draft content, and placement reason for your review
-4. Iterates until you confirm or skip; on confirm, writes the note and updates `dashboard.md`
-5. Removes only confirmed entries from the queue; skipped entries remain
+**How it works:** Two phases:
+1. Reads `_inbox/memory-queue.md` for entries from *other* conversations (not current session) — processes and removes them without re-reading source conversations
+2. Reads `_inbox/distill-queue.md` interactively, one entry at a time: reads source conversation, drafts note content, presents proposed path + draft for review; on confirm writes to `resources/` and updates `dashboard.md`; skipped entries remain
 
-**When to run:** When `_inbox/distill-queue.md` has pending items — typically after a conversation where Claude flagged items worth keeping as reference material.
+**When to run:** Periodically — when queues have accumulated entries from multiple sessions.
 
-### /housekeeping
+### /maintain
 
-**Purpose:** Maintenance sweep across all projects and conversations.
-
-**What it does:**
-- Scans `_conversations/` for files with empty `context` field; infers and backfills them
-- Checks all `_memory.md` and `_self/about.md` files against size limits
-- Offers to demote over-budget content below the `<!-- extended -->` marker
-- Runs `update-project-indexes.py` to rebuild project `index.md` files
-
-### /audit
-
-**Purpose:** Check all active projects for structural completeness.
+**Purpose:** Periodic vault health audit.
 
 **What it checks:**
-- Required files present: `CLAUDE.md`, `_memory.md`, `decisions.md`, `index.md`
-- Required `_memory.md` sections present: `Current status`, `Key decisions`, `Open questions`
-- `CLAUDE.md` has an "On sync memory" section
-- Cross-pollination candidates (decisions in one project that could apply to another)
+- Hook injection budgets — flags files approaching the 9,500-char limit
+- PARA lifecycle — identifies notes that may be miscategorised
+- Inbox aging — flags items sitting in `_inbox/` too long without processing
+- Queue retrospective — checks for queue entries that reference deleted conversations
 
-Report only — no auto-fixes.
+### /sync
 
-### /review-memory
+**Purpose:** Git operations — commit staged work, check or pull framework updates.
 
-**Purpose:** Audit AI-maintained files for staleness and accuracy.
+**How it works:** Claude reads `git diff --cached`, proposes a commit message, you confirm or edit, then Claude calls `python _scripts/commit.py "message"` which handles `git pull --rebase` → `git commit` → `git push`.
 
-**What it reviews:** `_self/about.md`, all project `_memory.md` files, all `decisions.md` files.
+**Why split:** Message drafting requires judgment. Git mechanics are deterministic. Keeping Claude in-conversation avoids spawning a cold-context agent to run shell commands.
 
-**Not reviewed:** Project `CLAUDE.md` files — these are co-authored and reviewed when changed; they don't drift silently the way memory files do.
+### /contribute
+
+**Purpose:** Contribute framework improvements from your instance to the upstream repository.
+
+**What it does:** Packages framework-path changes (scripts, templates, workflows, commands) into a branch and opens a PR to the upstream GitHub repo. Content paths are never included.
 
 
 ## ⚖️ The judgment / automation line
@@ -192,6 +170,8 @@ The goal for both: the injected summary stays bounded and useful while remaining
 **Multi-project sessions:** Mention all relevant projects in the first message — the hook matches all of them.
 
 
-## 🔄 Continue.dev as a parallel path
+## 🔒 Privacy and inference tiers
 
-Both paths can be active simultaneously — the line is yours to draw based on content sensitivity. For work involving personal or professional content, use Continue.dev + Ollama so nothing leaves your machine. See [continue-integration.md](continue-integration.md). Be aware that any file Claude Code reads is sent to Anthropic's API — read [PRIVACY.md](../PRIVACY.md).
+At Tier 1, any file Claude Code reads is sent to Anthropic's API — keep that boundary intentional. Read [PRIVACY.md](../PRIVACY.md).
+
+At Tier 2/3, set `ANTHROPIC_BASE_URL` to a LiteLLM gateway pointing at Ollama. Claude Code's behaviour is identical — hooks fire, slash commands work, conversations are saved — but inference stays on user-controlled infrastructure. See [private-cloud-setup.md](private-cloud-setup.md) (VPS) or [self-hosted-setup.md](self-hosted-setup.md) (own hardware).

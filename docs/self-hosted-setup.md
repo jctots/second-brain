@@ -1,21 +1,23 @@
-# 🏠 Self-Hosted Setup (Tier 2)
+# 🏠 Self-Hosted Setup (Tier 3)
 
-How to add Gitea and Ollama alongside your existing GitHub + Claude Code setup. Tier 2 gives you full data sovereignty — your notes are hosted privately, your LLM runs locally, and your content CI never touches a cloud service.
+How to add Gitea, LiteLLM, and Ollama on your own hardware alongside your existing GitHub + Claude Code setup. Tier 3 gives you full data sovereignty — your notes are hosted on hardware you own, your LLM runs on your own infrastructure, and your content CI never touches a cloud service.
 
 See [getting-started.md](getting-started.md) for the Tier 1 setup this builds on.
+See [private-cloud-setup.md](private-cloud-setup.md) for Tier 2 (same stack on a rented VPS — no local hardware required).
 
 
-## 🏗️ What Tier 2 adds
+## 🏗️ What Tier 3 adds
 
-| | Tier 1 — Evaluation | Tier 2 — Full private |
+| | Tier 1 — Cloud | Tier 3 — Self-hosted |
 |---|---|---|
-| Git host | GitHub | Gitea (self-hosted) |
-| AI | Claude Code | Continue.dev + Ollama |
+| Git host | GitHub | Gitea (own hardware) |
+| AI inference | Anthropic API | LiteLLM + Ollama (own hardware) |
 | Framework CI | GitHub Actions | GitHub Actions |
 | Content CI | — | Gitea Actions |
+| Hardware required | None | Own hardware + GPU (recommended) |
 | Data sovereignty | Partial | Full |
 
-Both tiers use the same framework from the upstream GitHub repo. Tier 2 adds infrastructure alongside — nothing from Tier 1 is removed. GitHub Actions continues to run framework tests on your public fork; Gitea Actions handles content-aware automation (index generation, budget tests) that must not run on GitHub.
+Both tiers use Claude Code — the only difference is `ANTHROPIC_BASE_URL`. Tier 3 adds infrastructure alongside Tier 1; nothing is removed. GitHub Actions continues to run framework tests on your public fork; Gitea Actions handles content-aware automation (index generation, budget tests) that must not run on GitHub.
 
 
 ## 📋 Prerequisites
@@ -53,6 +55,18 @@ services:
     volumes:
       - ollama-data:/root/.ollama
 
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_KEY}
+    command: --model ollama/qwen2.5:7b --port 4000
+    depends_on:
+      - ollama
+
   gitea-runner:
     image: gitea/act_runner:latest
     container_name: gitea-runner
@@ -70,9 +84,16 @@ volumes:
   ollama-data:
 ```
 
+Set your LiteLLM key in a `.env` file next to `docker-compose.yml`:
+
+```bash
+LITELLM_KEY=sk-your-key-here
+RUNNER_TOKEN=  # fill in after Gitea is configured — see Gitea Actions section
+```
+
 The runner token is set after Gitea is configured — see the Gitea Actions section below.
 
-Start Gitea and Ollama first:
+Start Gitea and Ollama first (LiteLLM depends on Ollama being ready):
 
 ```bash
 docker compose up -d gitea ollama
@@ -179,7 +200,27 @@ For better reasoning quality if your hardware supports it:
 docker exec -it ollama ollama pull qwen2.5:32b
 ```
 
-Then configure Continue.dev to point at `http://localhost:11434`. See [continue-integration.md](continue-integration.md) for the full configuration and model recommendations.
+Then start LiteLLM:
+
+```bash
+docker compose up -d litellm
+```
+
+Verify LiteLLM is running: `curl http://localhost:4000/health` should return OK.
+
+
+## ⚙️ Configure Claude Code
+
+Set these in your shell profile (`.bashrc`, `.zshrc`, or PowerShell profile):
+
+```bash
+export ANTHROPIC_BASE_URL=http://localhost:4000
+export ANTHROPIC_AUTH_TOKEN=sk-your-key-here
+```
+
+Restart VS Code. Claude Code routes all inference through LiteLLM → Ollama — nothing reaches Anthropic's API.
+
+To return to Anthropic: comment out both variables and restart VS Code.
 
 
 ## 📱 Configure obsidian-git → Gitea
@@ -204,6 +245,6 @@ git push origin main
 
 Open **Actions** in the Gitea web UI — the workflow should appear and complete. Delete `_inbox/test.md` afterwards.
 
-**Continue.dev + Ollama:**
+**Claude Code + LiteLLM:**
 
-Open a Continue.dev session and run `/load-context second-brain-setup`. Confirm the session loads context and all requests stay local — nothing sent to any external API.
+Open a Claude Code session. The hook announcement at session start confirms context injection is working. Check that `ANTHROPIC_BASE_URL` is set and that requests are routing through LiteLLM — nothing should reach Anthropic's API.
