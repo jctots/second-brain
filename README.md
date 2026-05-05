@@ -7,7 +7,7 @@ A platform for building with knowledge, not just storing it — plain markdown a
 version control as the foundation, with an AI that thinks with you across sessions
 and compounds what you learn into better work.
 
-**The recursive part:** the system and the person using it improve together. `second-brain-setup` — the project that designs this second brain — lives as a meta project inside it. It doesn't just support self-improvement; it contains the mechanism of its own improvement — the loop closes on itself. The deeper loop is human: past reasoning informs present decisions, behavioral patterns surface across sessions, knowledge compounds instead of just accumulating. The AI is a multiplier, through the systems you build — but what it multiplies is you.
+**The recursive part:** the system and the person using it improve together. `second-brain-setup` — the project that designs this second brain — lives as a meta project inside it. It doesn't just support self-improvement; it contains the mechanism of its own improvement — the loop closes on itself. The deeper loop is human: past reasoning informs present decisions, behavioral patterns surface across sessions, knowledge compounds instead of just accumulating. **The systems you build determine what AI multiplies — make sure it's you.**
 
 ## 🔍 The problem
 
@@ -32,26 +32,15 @@ Plain markdown in version control as the durable layer, with an AI coding assist
 the intelligence layer operating against structured context. Four behaviors run
 automatically:
 
-**Automatic context** — at session start, your profile, behavioral feedback, and project
-context (current state, open questions, past decisions) load via hook scripts. The AI
-enters each session already knowing who you are and what you're working on — no
-manual copy-paste, no re-explaining.
+**Automatic context** — at session start, your profile, behavioral feedback, and project context load via hook scripts. The AI enters each session already knowing who you are and what you're working on.
 
-**Automatic memory** — at session end, `/remember` persists decisions, project state,
-and behavioral corrections to the right files. What the AI learns in one session is
-available in the next.
+**Automatic memory** — during sessions, the AI emits 🧠 markers when a decision, project state change, or behavioral pattern is worth keeping, and ✅ markers when a next action surfaces. At session end, `/remember` processes them into the right files. What the AI learns in one session is available in the next.
 
-**Automatic capture** — during sessions, the AI identifies topics worth keeping as
-reference material and queues them as draft note proposals. Run `/distill` to review
-each proposal interactively — refine, confirm, or skip. Notes accumulate because the
-system noticed them, not because you remembered to write them.
+**Automatic capture** — during sessions, the AI emits 🗂️ markers when something has lasting reference value. Run `/distill` to review proposals interactively — confirm, refine, or skip. Notes accumulate because the system noticed them, not because you remembered to write them.
 
-**Automatic retrieval** — knowledge comes back two ways: relevant notes surface
-automatically via retrieval-augmented generation (RAG), and you can ask the agent
-directly — "what do I know about X?" — and it searches and synthesizes from your
-vault on demand. Passive surfacing and active query, both in the same session.
+**Automatic retrieval** — relevant notes surface automatically at session start via RAG. Ask the agent directly with `/search "topic"` to query on demand — semantic search (Tier 2/3) or keyword (Tier 1). Passive surfacing and active query in the same session.
 
-See `docs/claude-integration.md` for the full technical detail.
+See [docs/claude-integration.md](docs/claude-integration.md) for the full technical detail.
 
 ## 🧠 Why "second brain"?
 
@@ -83,9 +72,7 @@ captures why things are the way they are — decisions, constraints, what was re
 When reasoning history gets long, it splits into a dedicated `decisions.md`. The design
 rationale for this system is published in `docs/`.
 
-**AI-proposed capture via `/distill`.** During every session, the AI surfaces reference
-material candidates and queues them for review. You decide what stays — the system
-does the noticing.
+**AI-proposed capture via event markers.** During every session, the AI emits inline markers — 🧠 memory, 🗂️ distill, ✅ task — saved to conversation frontmatter automatically. `/remember` and `/distill` process them on demand. You decide what stays — the system does the noticing.
 
 **Agent-agnostic structure.** Hooks are plain Python scripts and notes are plain
 Markdown. The AI tool is a choice, not load-bearing infrastructure.
@@ -105,6 +92,8 @@ Markdown. The AI tool is a choice, not load-bearing infrastructure.
 | Data stays on machine   | —                          | ✓                   | ✓ (local LLM path)    |
 | Setup complexity        | none                       | low                 | medium                |
 
+*For known limitations and planned improvements, see [evolution.md](docs/evolution.md).*
+
 ## 🚀 Deployment tiers
 
 Three tiers built from the same framework. Start at Tier 1 — add tiers as your privacy needs grow.
@@ -115,7 +104,7 @@ Three tiers built from the same framework. Start at Tier 1 — add tiers as your
 | 2 | Private cloud | Gitea on VPS | Claude Code → LiteLLM → Ollama (VPS) | None (VPS subscription) |
 | 3 | Self-hosted | Gitea on own hardware | Claude Code → LiteLLM → Ollama (own hardware) | Own hardware + GPU |
 
-**Same tool across all tiers.** Claude Code is the AI interface at every tier. What changes is where inference happens — set `ANTHROPIC_BASE_URL` to point at a LiteLLM gateway for Tier 2/3, unset it to return to Anthropic. Hooks, slash commands, context injection, and conversation saving work identically at every tier.
+**Same tool across all tiers.** Claude Code is the AI interface at every tier. What changes is where inference happens — set `ANTHROPIC_BASE_URL` to point at a LiteLLM gateway for Tier 2/3, unset it to return to Anthropic. Hooks, slash commands, context injection, and conversation saving work identically at every tier. **Tier 2/3 requires an Anthropic API key** (`ANTHROPIC_API_KEY` from [console.anthropic.com](https://console.anthropic.com)) — incompatible with claude.ai subscription (OAuth). With the gateway fixed, switch between Claude and local models via `--model` (e.g., `claude --model llama3`); LiteLLM routes by model name.
 
 **Tier 1 — Cloud.** GitHub template → clone → run setup → start. No infrastructure. Suitable for: framework evaluation, non-sensitive content, public notes. Privacy caveat: files Claude Code reads are sent to Anthropic's API — keep that boundary intentional.
 
@@ -123,7 +112,25 @@ Three tiers built from the same framework. Start at Tier 1 — add tiers as your
 
 **Tier 3 — Self-hosted.** Gitea, LiteLLM, and Ollama all on user-owned hardware. No data leaves user-owned infrastructure. Suitable for: comprehensive capture of personal, professional, and sensitive content with maximum sovereignty.
 
-See `docs/getting-started.md` for setup instructions. See `docs/self-hosted-setup.md` for Tier 2/3 infrastructure detail (Docker Compose, Gitea, Gitea Actions runner, vault migration).
+See [docs/getting-started.md](docs/getting-started.md) for setup instructions. See [docs/private-cloud-setup.md](docs/private-cloud-setup.md) for Tier 2 and [docs/self-hosted-setup.md](docs/self-hosted-setup.md) for Tier 3 infrastructure detail.
+
+**What this repo contains — and what it doesn't.** The framework (scripts, hooks, templates, slash commands, CI workflows, infrastructure config) is what you're looking at here. Your notes — everything under `personal/`, `professional/`, `public/`, `_self/`, `_daily/`, `_inbox/`, and `_conversations/` — never leave your instance. The `.gitignore` enforces this structurally, not just by convention. When you fork, you get the framework. What you build with it stays yours.
+
+## ⚡ Slash commands
+
+Invoked by typing `/command-name` in a Claude Code session. Defined as Markdown files in `.claude/commands/` — no registration required.
+
+| Command | When | What |
+|---|---|---|
+| `/remember` | End of session | Process 🧠 and ✅ markers from current conversation into memory and task targets |
+| `/distill` | Periodically | Process 🗂️ markers from current conversation into durable `resources/` notes |
+| `/maintain` | Periodically | Vault health audit — artifacts, pending events, reports, reviews |
+| `/sync` | When committing | Git commit with Claude-drafted message + push |
+| `/search` | Anytime | Query vault by meaning (Tier 2/3) or keyword (Tier 1) |
+| `/contribute` | When improving | Package framework changes → PR to upstream |
+
+See [docs/claude-integration.md](docs/claude-integration.md) for full command descriptions.
+
 
 ## 🛠️ Tool roles
 
@@ -146,7 +153,7 @@ Each context follows the same PARA layout:
 └── archive/         ← completed or inactive items
 ```
 
-Special folders: `_conversations/`, `_daily/`, `_inbox/`, `_scripts/`, `_templates/`
+Special folders: `_conversations/`, `_daily/`, `_inbox/`, `_infrastructure/`, `_scripts/`, `_templates/`
 
 Projects are the natural entry point — areas and resources grow from active
 project work as the agent surfaces opportunities to capture reference material.
@@ -175,7 +182,18 @@ your own projects.
 **Add later — Tier 2/3 (private inference):** [LiteLLM](https://litellm.ai),
 [Ollama](https://ollama.com), self-hosted Gitea (Tier 2: VPS · Tier 3: own hardware)
 
-See `docs/getting-started.md` for the full walkthrough and model recommendations.
+See [docs/getting-started.md](docs/getting-started.md) for the full walkthrough and model recommendations.
+
+## 🤝 Contributing
+
+This framework is built to be used and improved. If you fork it and build something better — a script, a hook, a template, a workflow improvement — the path back upstream is already set up.
+
+**GitHub template:** Fork or use this repo as a template to start your own instance. Your notes never leave your machine; only framework changes travel upstream.
+
+**`/contribute`:** The slash command packages your framework-path changes into a branch and prepares a PR description — no manual cherry-picking or content-filtering required.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, content safety guarantees, and how to report bugs or suggest improvements.
+
 
 ## 🙏 Prior art and influences
 
@@ -186,4 +204,4 @@ See `docs/getting-started.md` for the full walkthrough and model recommendations
 - [LiteLLM](https://litellm.ai) — LLM gateway (Anthropic API → Ollama translation layer)
 - [Ollama](https://ollama.com) — local LLM runtime
 
-The goal was never better notes. It was better work — and a system smart enough to make you better at what you do.
+> "The goal was never better notes. It was better work — built on a system that compounds what you build."

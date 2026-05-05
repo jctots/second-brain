@@ -1,52 +1,15 @@
-# ── personal ──────────────────────────────────────────────────────────────────
-personal/**
+# Ignore the workspace layout (the main culprit of merge conflicts)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
 
-# preserve PARA skeleton
-!personal/projects/
-!personal/projects/.gitkeep
-!personal/areas/
-!personal/areas/.gitkeep
-!personal/resources/
-!personal/resources/.gitkeep
-!personal/archive/
-!personal/archive/.gitkeep
+# Ignore the cache and indexed database
+.obsidian/cache/
+.obsidian/indexedDWB/
 
-# preserve sbs framework files (including blank starters)
-!personal/projects/second-brain-setup/
-!personal/projects/second-brain-setup/**
+# Ignore plugin binaries — Obsidian downloads these automatically
+.obsidian/plugins/*/main.js
+.obsidian/plugins/*/styles.css
+.obsidian/plugins/*/obsidian_askpass.sh
 
-# ── professional ──────────────────────────────────────────────────────────────
-professional/**
-
-!professional/projects/
-!professional/projects/.gitkeep
-!professional/areas/
-!professional/areas/.gitkeep
-!professional/resources/
-!professional/resources/.gitkeep
-!professional/archive/
-!professional/archive/.gitkeep
-
-# ── public ────────────────────────────────────────────────────────────────────
-public/**
-
-!public/projects/
-!public/projects/.gitkeep
-!public/areas/
-!public/areas/.gitkeep
-!public/resources/
-!public/resources/.gitkeep
-!public/archive/
-!public/archive/.gitkeep
-
-# ── other content paths ───────────────────────────────────────────────────────
-_self/**
-!_self/.gitkeep
-
-_daily/**
-!_daily/.gitkeep
-
-_conversations/**
-
-_inbox/**
-!_inbox/.gitkeep
+# Optional: Ignore community plugin storage if it's too noisy
+# .obsidian/plugins/*/data.json

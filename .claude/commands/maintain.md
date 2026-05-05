@@ -1,104 +1,91 @@
-Vault health audit. Execute in order:
+Vault health audit.
 
-## Step 1 — Run scripts and collect budget data
+Ask the user which operation:
 
-Run all scripts:
+**(1) Generate artifacts** — run scripts locally, same as CI
+**(2) Pending events** — surface and process missed events from past conversations
+**(3) Reports** — automated scans, findings only, no edits
+**(4) Reviews** — read and reason about content, propose changes for user confirmation
+
+---
+
+## Option 1 — Generate artifacts
+
+Run all scripts in order:
 - `python _scripts/index-conversations.py`
 - `python _scripts/update-project-indexes.py`
+- `python _scripts/generate-pending-events.py`
 - `python _tests/test_r6_hook_budget.py`
 
-Collect budget output for use in steps 4 and 5.
+Report: what was regenerated and budget output summary.
 
 ---
 
-## Step 2 — Review AI-maintained memory files
+## Option 2 — Pending events
 
-Find all AI-maintained vault memory files:
-- `_self/about.md`, `_self/rules.md`
-- For each active project (any folder under `personal/projects/`, `professional/projects/`, `public/projects/` containing a `_memory.md`): that project's `_memory.md`
+1. Read `_conversations/pending-events.md`. If empty or missing, report no pending events and stop.
 
-For each file:
-- Read the summary section (content above `<!-- extended -->`, or full file if no marker)
-- Note the last-modified date
-- Flag with ⚠️ if last modified more than 30 days ago
+2. For each pending conversation, one at a time:
+   a. Read the conversation file.
+   b. Find all 🧠, 🗂️, and ✅ marker lines and their descriptions.
+   c. For 🧠 and ✅ markers: process as `/remember` would — route to the correct target file and write using Edit.
+   d. For 🗂️ markers: process as `/distill` would — draft note, show proposed path and content, wait for user confirmation before writing.
+   e. On completion: update the conversation file's `processed` frontmatter field using Edit to reflect what was actioned.
 
-Print each file's summary section in full, grouped by file, with path and last-modified date as header. Do not summarize — show raw content.
+3. Run `python _scripts/generate-pending-events.py` to refresh `_conversations/pending-events.md`.
 
-After all files are shown, list flagged files and invite the user to identify what needs updating. Do not make edits — report only.
-
----
-
-## Step 3 — Workspace memory violation check
-
-Locate the Claude workspace memory directory for this repo: `~/.claude/projects/{encoded-repo-path}/memory/`. Read `MEMORY.md`. If any files other than `MEMORY.md` exist in that directory, flag them with 🚨 — workspace memory is retired. List filenames and content so the user can decide to migrate or delete.
+4. Report: what was written, what was skipped, and how many conversations remain pending.
 
 ---
 
-## Step 4 — Consolidate `_self/` files
+## Option 3 — Reports
 
-Using the budget output from step 1:
-- **Deduplication**: check for bullets in `_self/about.md` and `_self/rules.md` that express the same trait from different angles — merge in-place.
-- **Consolidation**: if `## Reflection` in `about.md` exceeds 20 bullets, group related bullets into labeled sub-clusters.
-- If either file is over 80%, identify candidates for condensing and offer to apply. Flag as urgent if over 9,500 chars.
-- Apply all changes only with confirmation. Always use Edit — never Write.
+Run all checks and report findings. No edits.
 
----
+1. **Structural audit** — for each active project under `personal/projects/`, `professional/projects/`, `public/projects/`, check:
+   - Has all required files: `index.md`, `CLAUDE.md`, `_memory.md`?
+   - Has significant design history → has `decisions.md`?
+   - Has stable operational reference → has `reference.md`?
+   - Scan for cross-pollination: note any pattern, convention, or file in one project absent in another where it would be useful.
 
-## Step 5 — Project file budget management
+   Report as a table:
 
-For each active project, using the budget output from step 1: if `CLAUDE.md` or `_memory.md` exceeds 80% (7,600 chars), identify candidates for demotion and offer to apply. Demotion options: move to extended section or delete if clearly stale. Always use Edit — never Write.
+   | Project | Missing files | Cross-pollination candidates |
+   |---|---|---|
 
----
+2. **PARA lifecycle** — scan all items across `projects/` and `areas/` in every context. Apply the full transition table:
 
-## Step 6 — Project structural audit
+   | Check | Flag |
+   |---|---|
+   | `projects/` with no defining goal and no open questions | → `areas/` candidate |
+   | `projects/` with goal met and no ongoing responsibility | → `archive/` candidate |
+   | `areas/` with an active bounded goal | → `projects/` candidate |
+   | `areas/` with responsibility fully ended | → `archive/` candidate |
+   | `projects/` or `areas/` that is pure stable reference | → extract to `resources/` via `/distill` |
 
-For each active project found in step 2, check:
-- Has all required files: `index.md`, `CLAUDE.md`, `_memory.md`?
-- `CLAUDE.md` contains an "On sync memory" section?
-- `_memory.md` uses fixed-sections-in-place pattern (Current status, Key decisions, Open questions)?
-- Has significant design history → has `decisions.md`?
-- Has stable operational reference → has `reference.md`?
+   Do not move anything — report only.
 
-Scan for cross-pollination: note any pattern, convention, or file in one project absent in another where it would be useful.
+3. **Inbox aging** — scan `_inbox/` for files older than 14 days (compare `created` frontmatter or filename date against today). List with age — do not move or delete.
 
-Report as a table:
+4. **Conversation frontmatter** — scan `_conversations/` for files with an empty or missing `projects` field. List as candidates for manual tagging.
 
-| Project | Missing files | CLAUDE.md gaps | _memory.md pattern | Cross-pollination candidates |
-|---|---|---|---|---|
-
----
-
-## Step 7 — PARA lifecycle check
-
-For each active project found in step 2, apply the lifecycle test from root `CLAUDE.md`:
-- Ask: *"Is there a defining goal still being worked toward?"*
-- If no defining goal and no open questions → flag as area candidate
-- If `_memory.md` has no open questions and no recent state changes → flag for review
-
-Flag mismatches as: _"[project] may fit `areas/` better — no active goal found."_ Do not move anything — report only.
+5. **Workspace memory violations** — locate `~/.claude/projects/{encoded-repo-path}/memory/`. Read `MEMORY.md`. If any files other than `MEMORY.md` exist, flag with 🚨 and list filenames and content so the user can decide to migrate or delete.
 
 ---
 
-## Step 8 — Inbox aging
+## Option 4 — Reviews
 
-Scan `_inbox/` for files older than 14 days (compare `created` frontmatter or filename date against today). List them with age — do not move or delete, just surface for review.
+Read and reason about content. Propose changes — apply only with user confirmation. Always use Edit, never Write.
 
----
+1. **Memory file review** — find all AI-maintained files: `_self/about.md`, `_self/rules.md`, and each active project's `_memory.md`. For each:
+   - Read the summary section (above `<!-- extended -->`, or full file if no marker)
+   - Note last-modified date — flag with ⚠️ if older than 30 days
+   - Print content in full, grouped by file. Do not summarize — show raw content.
+   - After all files shown, invite the user to identify what needs updating.
 
-## Step 9 — Conversation frontmatter
+2. **`_self/` consolidation** — check `_self/about.md` and `_self/rules.md` for:
+   - Duplicate bullets expressing the same trait from different angles — propose merging
+   - `## Reflection` exceeding 20 bullets — propose grouping into labeled sub-clusters
+   - Files over 80% of budget — identify candidates for condensing; flag as urgent if over 9,500 chars
 
-Scan `_conversations/` for files with an empty or missing `projects` frontmatter field. List them — do not infer or modify. Candidates for manual tagging.
-
----
-
-## Step 10 — Queue retrospective
-
-Identify conversations in `_conversations/` not referenced in either `_inbox/distill-queue.md` or `_inbox/memory-queue.md` (truly unprocessed — no `/remember` was run). Limit to the 10 most recent by filename date.
-
-For each unprocessed conversation found, scan for missed distill and memory queue candidates — apply the same criteria as the during-conversation checks in root `CLAUDE.md`. Append any candidates found to the appropriate queue file using Edit.
-
----
-
-## Step 11 — Report
-
-Summarise: index regeneration status, budget status of all files (flag any over 80% or over limit), memory files reviewed and flagged, structural audit table, PARA lifecycle flags, inbox items needing attention, conversation files missing frontmatter, and what was added to the queues in step 10.
+3. **Project budget management** — for each active project, if `CLAUDE.md` or `_memory.md` exceeds 80% (7,600 chars), identify candidates for demotion. Options: move to extended section or delete if clearly stale.

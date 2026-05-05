@@ -1,0 +1,42 @@
+# Second Brain — Infrastructure Stack
+# Single source of truth for all tooling and service requirements.
+# client: consumed by _scripts/setup.sh and _scripts/setup.ps1
+# services: reference manifest — deployed via docker-compose.yml
+
+client:
+  python:
+    version: "3.14"
+  vscode:
+    extensions:
+      - ms-python.python
+      - redhat.vscode-yaml
+      - anthropic.claude-code
+      - foam.foam-vscode
+      - esbenp.prettier-vscode
+
+services:
+  gitea:
+    image: gitea/gitea:latest
+    role: private git host
+    tiers: [2, 3]
+  gitea-runner:
+    image: gitea/act_runner:latest
+    role: Gitea Actions CI runner
+    tiers: [2, 3]
+  ollama:
+    image: ollama/ollama:latest
+    role: LLM and embedding model runtime
+    tiers: [2, 3]
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    role: Anthropic-compatible API gateway
+    tiers: [2, 3]
+  qdrant:
+    image: qdrant/qdrant:latest
+    role: vector store for semantic search
+    tiers: [2, 3]
+  caddy:
+    image: caddy:latest
+    role: HTTPS reverse proxy
+    tiers: [2]
+    compose_profile: https

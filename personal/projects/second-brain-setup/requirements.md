@@ -105,6 +105,7 @@ Index files and project file lists are generated artifacts, never edited manuall
 
 **Implications:**
 - `_conversations/index.md` is owned by `index-conversations.py`
+- `_conversations/pending-events.md` is owned by `generate-pending-events.py`
 - `## files` and `## relevant conversations` sections in project `index.md` files are owned by `update-project-indexes.py`
 - Tool-agnostic constraint: generated files must render correctly in Obsidian and Foam without plugins
 
@@ -134,9 +135,10 @@ No contributor has a privileged path to the public repository. The repository ow
 
 ## R10 — Deferred capture
 
-The system must support capture without requiring immediate processing. During a session, items of interest are silently queued to `_inbox/memory-queue.md` (memory candidates) and `_inbox/distill-queue.md` (note candidates) and processed on demand via `/sync-memory` and `/distill`. The queue entry format defined in root `CLAUDE.md` is a standing constraint — entries that deviate from it are not processable.
+The system must support capture without requiring immediate processing. During a session, the AI emits inline event markers (`🧠 [memory event]`, `🗂️ [distill event]`, `✅ [task event]`) with a one-line description. These are scanned by `save-conversation.py` and written to conversation frontmatter (`events`, `processed`). Processing happens on demand via `/remember` and `/distill`. Missed sessions are surfaced by `_conversations/pending-events.md` (CI-generated).
 
 **Implications:**
-- `_inbox/memory-queue.md` and `_inbox/distill-queue.md` are append-only capture zones during a session
-- Format conformance is required for machine-processability; freeform entries are not valid
-- Queued capture keeps sessions focused — items are logged without branching the current task
+- The conversation file is the source of truth — no separate queue files
+- Marker format defined in root `CLAUDE.md` is a standing constraint — markers without the correct prefix are not detected
+- Deferred capture keeps sessions focused — markers are emitted without branching the current task
+- `/maintain` option 2 serves as the backstop for sessions where `/remember` or `/distill` was not run

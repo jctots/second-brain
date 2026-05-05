@@ -1,0 +1,13 @@
+model_list:
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: qwen2.5:7b
+    litellm_params:
+      model: ollama/qwen2.5:7b
+      api_base: http://ollama:11434  # Docker service name; use http://localhost:11434 outside Docker
+
+litellm_settings:
+  master_key: os.environ/LITELLM_KEY

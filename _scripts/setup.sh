@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Setup script for Linux/macOS.
-# Reads infra.yaml and ensures the correct Python version and VS Code extensions are installed.
+# Reads _infrastructure/stack.yaml and ensures the correct Python version and VS Code extensions are installed.
 # Run from repo root: bash _scripts/setup.sh
 
 set -e
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-INFRA="$REPO_ROOT/infra.yaml"
+INFRA="$REPO_ROOT/_infrastructure/stack.yaml"
 
-# --- parse Python version from infra.yaml (no Python required at this stage) ---
+# --- parse Python version from _infrastructure/stack.yaml (no Python required at this stage) ---
 REQUIRED_VERSION="$(grep -E '^\s+version:' "$INFRA" | head -1 | sed -E 's/.*version:[[:space:]]*"?([0-9]+\.[0-9]+[.0-9]*)"?.*/\1/')"
 if [ -z "$REQUIRED_VERSION" ]; then
-    echo "ERROR: could not read python.version from infra.yaml"
+    echo "ERROR: could not read python.version from _infrastructure/stack.yaml"
     exit 1
 fi
 REQUIRED_MAJOR="${REQUIRED_VERSION%%.*}"

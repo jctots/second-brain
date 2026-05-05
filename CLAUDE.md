@@ -26,13 +26,14 @@ Each context has the same PARA structure:
 
 | Folder            | Purpose                                                                |
 | ----------------- | ---------------------------------------------------------------------- |
-| `_conversations/` | Saved Claude Code session transcripts                                  |
-| `_daily/`         | Mixed daily notes — time-indexed, spans all contexts                   |
-| `_inbox/`         | Capture zone — no context yet, process and move out                    |
-| `_scripts/`       | Automation scripts (indexing, hook injection, conversation saving)     |
-| `_self/`          | AI-maintained profile and behavioral reflection about the user         |
-| `_templates/`     | Note templates — each file is self-documenting with usage instructions |
-| `_tests/`         | Tests for scripts and hook budget enforcement                          |
+| `_conversations/`   | Saved Claude Code session transcripts                                  |
+| `_daily/`           | Mixed daily notes — time-indexed, spans all contexts                   |
+| `_inbox/`           | Capture zone — no context yet, process and move out                    |
+| `_infrastructure/`  | Infrastructure stack — `stack.yaml` (tooling manifest) + Docker Compose for Tier 2/3 |
+| `_scripts/`         | Automation scripts (indexing, hook injection, conversation saving)     |
+| `_self/`            | AI-maintained profile and behavioral reflection about the user         |
+| `_templates/`       | Note templates — each file is self-documenting with usage instructions |
+| `_tests/`           | Tests for scripts and hook budget enforcement                          |
 
 ## PARA lifecycle
 
@@ -122,7 +123,7 @@ Each active project folder may contain a `_memory.md` file — a running log of 
 
 **Trigger:** Run `/remember` at the end of any conversation. Steps are defined in `.claude/commands/remember.md`.
 
-**Reminder:** At the end of each working session, if `_inbox/memory-queue.md` has unprocessed entries, remind the user: _"There are items in the memory queue — run `/remember` to process them."_
+**Reminder:** At the end of each working session, if 🧠, 🗂️, or ✅ event markers were emitted during the conversation and `/remember` or `/distill` has not been run, remind the user: _"Events were captured this session — run `/remember` and/or `/distill` to process them."_
 
 ## Context at conversation start
 
@@ -147,15 +148,26 @@ When project names are mentioned in the first message, `_scripts/inject-context.
 
 ## During-conversation captures
 
-These are independent checks — evaluate both for every observation. A single conversation may produce candidates for both queues simultaneously.
+Evaluate independently throughout the conversation. A single exchange may trigger multiple events.
 
-**Distill queue** — triggers when something has lasting reference value beyond this project: technology analysis, tool comparisons, design patterns, architectural concepts, mental models. Does not trigger for: project-specific decisions (→ `decisions.md`), ephemeral task details, topics already covered in an existing note (duplicate check is `/distill`'s job, not the queue's).
-(1) Append to `_inbox/distill-queue.md` using Edit, format: `- [topic] — context: "one-line reasoning why this is worth keeping" — proposed: \`path/to/note.md\` — source: [[_conversations/YYYY/MM/filename]]`;
-(2) notify in one line: `→ added to distill queue: [topic]`. Do not elaborate or branch the conversation.
+Emit each marker on its own line immediately after the relevant response. Include a one-line description. Do not elaborate or branch the conversation.
 
-**Memory queue** — triggers when a memory-worthy item is observed: project state change, architectural decision, profile fact, behavioral feedback.
-(1) Append to `_inbox/memory-queue.md` using Edit, format: `- [topic] — context: "one-line snippet capturing the key reasoning" — target: \`path/to/memory-file.md\` — source: [[_conversations/YYYY/MM/filename]]`;
-(2) notify in one line: `→ added to memory queue: [topic]`. Do not elaborate or branch the conversation.
+**🧠 `[memory event]`** — project state change, key decision, profile fact, behavioral observation.
+Format: `🧠 [memory event]: one-line description`
+
+**🗂️ `[distill event]`** — lasting reference value beyond this project: technology analysis, tool comparisons, design patterns, architectural concepts, mental models. Does not trigger for project-specific decisions or ephemeral details.
+Format: `🗂️ [distill event]: one-line description`
+
+**✅ `[task event]`** — concrete next action identified for the user.
+Format: `✅ [task event]: one-line description`
+
+These markers are scanned by `save-conversation.py` and written to the conversation frontmatter as `events: [memory, distill, task]`. `/remember` and `/distill` process events from the current conversation directly. Missed conversations are caught by `/maintain` via `_inbox/pending-events.md` (CI-generated).
+
+**Processed markers** — emit immediately after actioning an event. Scanned by `save-conversation.py` into the `processed` frontmatter field.
+
+- `🔁 [memory event processed]` — emit via `/remember` after writing to a memory target
+- `📋 [task event processed]` — emit via `/remember`, **or emit inline immediately after completing a `✅` task directly in this conversation**
+- `📦 [distill event processed]` — emit via `/distill` after writing to `resources/`
 
 ## Token and cost awareness
 
