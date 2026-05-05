@@ -1,21 +1,20 @@
 # 🚀 Getting Started
 
-How to fork this template and set up your own AI-assisted second brain. Start with Claude Code + GitHub — no local infrastructure needed. Add Continue.dev + Ollama alongside it when you need local-first processing for sensitive content.
+How to fork this template and set up your own AI-assisted second brain. Start with Claude Code + GitHub — no local infrastructure needed. Add private inference (Tier 2 or Tier 3) when you're ready to capture sensitive content without sending it to Anthropic.
 
 
 ## 🏗️ Deployment tiers
 
-This system supports two deployment tiers. Most users start with Tier 1 and add Tier 2 when they're ready to capture sensitive content privately.
+| | Tier 1 — Cloud | Tier 2 — Private cloud | Tier 3 — Self-hosted |
+|---|---|---|---|
+| Git host | GitHub | Gitea on VPS | Gitea on own hardware |
+| AI inference | Anthropic API | LiteLLM + Ollama (VPS) | LiteLLM + Ollama (own hardware) |
+| Framework CI | GitHub Actions | GitHub Actions | GitHub Actions |
+| Content CI | — | Gitea Actions | Gitea Actions |
+| Hardware required | None | None (VPS subscription) | Own hardware + GPU |
+| Data sovereignty | Partial | Inference on user-controlled infra | Full |
 
-| | Tier 1 — Evaluation | Tier 2 — Full private |
-|---|---|---|
-| Git host | GitHub | Gitea (self-hosted) |
-| AI | Claude Code | Continue.dev + Ollama |
-| Framework CI | GitHub Actions | GitHub Actions |
-| Content CI | — | Gitea Actions |
-| Data sovereignty | Partial | Full |
-
-Steps 1–7 walk through the initial setup for both tiers — path-specific steps are labelled. See [self-hosted-setup.md](self-hosted-setup.md) for the Tier 2 infrastructure.
+Claude Code is the AI interface at every tier — only `ANTHROPIC_BASE_URL` changes. Steps 1–7 below cover Tier 1. See [private-cloud-setup.md](private-cloud-setup.md) for Tier 2 and [self-hosted-setup.md](self-hosted-setup.md) for Tier 3.
 
 
 ## 📋 Prerequisites
@@ -26,9 +25,9 @@ Steps 1–7 walk through the initial setup for both tiers — path-specific step
 | Python 3.8+ | Both | For hook scripts and automation |
 | [Obsidian](https://obsidian.md) | Both (recommended) | Reading, navigation, graph view, and mobile access |
 | [Foam extension](https://marketplace.visualstudio.com/items?itemName=foam.foam-vscode) | Both (recommended) | VS Code wikilink resolution and graph view |
-| [Claude Code extension](https://marketplace.visualstudio.com/items?itemName=Anthropic.claude-code) | Cloud path | AI agent via Anthropic API |
-| [Continue.dev extension](https://marketplace.visualstudio.com/items?itemName=Continue.continue) | Local-first path | AI agent, runs locally via Ollama |
-| [Ollama](https://ollama.com) | Local-first path | Local LLM runtime — nothing leaves your machine |
+| [Claude Code extension](https://marketplace.visualstudio.com/items?itemName=Anthropic.claude-code) | All tiers | AI agent — Anthropic API (Tier 1) or LiteLLM gateway (Tier 2/3) |
+| [LiteLLM](https://litellm.ai) | Tier 2/3 | Gateway that translates Claude Code's API format to Ollama |
+| [Ollama](https://ollama.com) | Tier 2/3 | Local LLM runtime |
 
 
 ## 🍴 Step 1: Fork and clone
@@ -69,30 +68,28 @@ What setup does:
 - Configures the save-conversation hook in VS Code settings
 
 
-## ☁️ Step 3: Sign in to Claude Code (cloud path only)
-
-Skip this step if you are starting with Continue.dev + Ollama.
+## ☁️ Step 3: Sign in to Claude Code
 
 Open the Claude Code panel in VS Code (sidebar icon). Follow the sign-in prompts — it will open a browser to authenticate with your Anthropic account.
 
+This connects to Anthropic's API (Tier 1). To switch to private inference later, set `ANTHROPIC_BASE_URL` to a LiteLLM gateway — see [private-cloud-setup.md](private-cloud-setup.md) or [self-hosted-setup.md](self-hosted-setup.md).
 
-## 🦙 Step 4: Pull a model (local-first path only)
 
-Skip this step if you are starting with Claude Code.
+## 🦙 Step 4: Pull a model (Tier 2/3 only)
 
-Pull a model via Ollama. For note management tasks (not coding), a smaller reasoning model is sufficient:
+Skip this step if staying on Tier 1.
+
+Once your LiteLLM + Ollama stack is running (see the tier setup docs), pull a model:
 
 ```bash
+# For most hardware — good balance of quality and speed
 ollama pull qwen2.5:7b
-```
 
-For a larger, more capable model if your hardware supports it:
-
-```bash
+# For better reasoning if your hardware supports it
 ollama pull qwen2.5:32b
 ```
 
-See [docs/continue-integration.md](continue-integration.md) for model recommendations and how to configure Continue.dev to use Ollama.
+For CPU-only inference (Tier 2 VPS), 7B is the practical ceiling. For GPU hardware (Tier 3), larger models are viable.
 
 
 ## 👤 Step 5: Create your profile
@@ -142,9 +139,12 @@ personal/projects/my-project/
 
 ## 💬 Step 7: Start a conversation
 
-**Cloud path (Claude Code):** Open VS Code, open the Claude Code extension, and start a session. Reference your project in the first message — the hook scripts inject context automatically. See [docs/claude-integration.md](claude-integration.md) for the full hook architecture.
+Open VS Code, open the Claude Code extension, and start a session. Reference your project in the first message — the hook scripts inject context automatically (profile, rules, project `CLAUDE.md` and `_memory.md`).
 
-**Local-first path (Continue.dev):** Open VS Code, open the Continue.dev sidebar, and start a session. Reference your project and instruction files explicitly in the first message — context is not injected automatically. See [docs/continue-integration.md](continue-integration.md) for context loading patterns.
+The hook announcement at session start confirms what was loaded:
+> *"Loaded: `personal/projects/my-project/CLAUDE.md` + `_memory.md`"*
+
+No announcement = hook miss. See [docs/claude-integration.md](claude-integration.md) for the full hook architecture and slash command reference.
 
 
 ## 🗂️ Folder structure you'll build out
@@ -170,11 +170,11 @@ your-repo/
 
 ## 💡 Tips
 
-**Keep project instruction files under ~3,000 characters combined with `_memory.md`.** Context has a budget — large files may be silently truncated. See [continue-integration.md](continue-integration.md) for details.
+**Keep project instruction files under ~7,600 characters each.** Context has a hard budget per hook — large files are silently truncated. Use the `<!-- extended -->` marker in `_memory.md` to keep injected content bounded. See [claude-integration.md](claude-integration.md) for details.
 
 **Name your project folders with kebab-case.** Easier to detect from natural language in your first message.
 
-**Run `/sync-memory` at the end of sessions with significant decisions.** This is what keeps `_memory.md` useful — without it, context is lost between sessions. (Claude Code path only — see [continue-integration.md](continue-integration.md) for the Continue.dev equivalent.)
+**Run `/remember` at the end of sessions with significant decisions.** This is what keeps `_memory.md` useful — without it, context is lost between sessions.
 
 
 ## 📱 Obsidian for reading and mobile

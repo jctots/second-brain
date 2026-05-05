@@ -37,9 +37,9 @@ context (current state, open questions, past decisions) load via hook scripts. T
 enters each session already knowing who you are and what you're working on — no
 manual copy-paste, no re-explaining.
 
-**Automatic memory** — at any point in a session, `/sync-memory` persists decisions,
-project state, and behavioral corrections to the right files. What the AI learns in one
-session is available in the next.
+**Automatic memory** — at session end, `/remember` persists decisions, project state,
+and behavioral corrections to the right files. What the AI learns in one session is
+available in the next.
 
 **Automatic capture** — during sessions, the AI identifies topics worth keeping as
 reference material and queues them as draft note proposals. Run `/distill` to review
@@ -51,7 +51,7 @@ automatically via retrieval-augmented generation (RAG), and you can ask the agen
 directly — "what do I know about X?" — and it searches and synthesizes from your
 vault on demand. Passive surfacing and active query, both in the same session.
 
-See `docs/claude-integration.md` and `docs/continue-integration.md` for the full technical detail.
+See `docs/claude-integration.md` for the full technical detail.
 
 ## 🧠 Why "second brain"?
 
@@ -105,35 +105,25 @@ Markdown. The AI tool is a choice, not load-bearing infrastructure.
 | Data stays on machine   | —                          | ✓                   | ✓ (local LLM path)    |
 | Setup complexity        | none                       | low                 | medium                |
 
-## 🚀 Deployment options
+## 🚀 Deployment tiers
 
-**New here?** Start with Claude Code + GitHub — no local infrastructure needed. Add the
-local-first path alongside it when you're ready to capture sensitive content.
+Three tiers built from the same framework. Start at Tier 1 — add tiers as your privacy needs grow.
 
-The AI tool choice is per task, not per setup:
+| Tier | Name | Git hosting | AI inference | Hardware required |
+| ---- | ---- | ----------- | ------------ | ----------------- |
+| 1 | Cloud | GitHub | Claude Code → Anthropic API | None |
+| 2 | Private cloud | Gitea on VPS | Claude Code → LiteLLM → Ollama (VPS) | None (VPS subscription) |
+| 3 | Self-hosted | Gitea on own hardware | Claude Code → LiteLLM → Ollama (own hardware) | Own hardware + GPU |
 
-| Content type                                          | AI tool               | Infrastructure |
-| ----------------------------------------------------- | --------------------- | -------------- |
-| Non-sensitive — public notes, framework, contributing | Claude Code           | GitHub         |
-| Sensitive — personal, professional                    | Continue.dev + Ollama | Gitea          |
+**Same tool across all tiers.** Claude Code is the AI interface at every tier. What changes is where inference happens — set `ANTHROPIC_BASE_URL` to point at a LiteLLM gateway for Tier 2/3, unset it to return to Anthropic. Hooks, slash commands, context injection, and conversation saving work identically at every tier.
 
-The line is yours to draw. `public/` content is typically safe for cloud AI; `personal/`
-and `professional/` typically aren't. Framework files are non-sensitive by design.
+**Tier 1 — Cloud.** GitHub template → clone → run setup → start. No infrastructure. Suitable for: framework evaluation, non-sensitive content, public notes. Privacy caveat: files Claude Code reads are sent to Anthropic's API — keep that boundary intentional.
 
-**The pragmatic setup:** GitHub for the framework, Gitea for all content, Claude Code for
-non-sensitive work, Continue.dev + Ollama for sensitive work — both paths active,
-each used where appropriate.
+**Tier 2 — Private cloud.** Gitea on a VPS (content host and CI runner). LiteLLM + Ollama on the same VPS. Claude Code routes through LiteLLM instead of Anthropic — no local GPU required. Suitable for: sensitive content without homelab hardware. Privacy: inference stays on user-controlled infrastructure.
 
-The local-first path requires self-hosted infrastructure: Gitea (content host and CI
-runner — Gitea Actions handles content-aware automation that cannot run on GitHub) and
-Ollama (local models). Evaluate the setup and maintenance cost before committing.
+**Tier 3 — Self-hosted.** Gitea, LiteLLM, and Ollama all on user-owned hardware. No data leaves user-owned infrastructure. Suitable for: comprehensive capture of personal, professional, and sensitive content with maximum sovereignty.
 
-See `docs/self-hosted-setup.md` for the full Tier 2 setup (Docker Compose, Gitea, Gitea Actions runner, vault migration).
-
-Privacy caveat: any file Claude Code reads is sent to Anthropic's API. Keep that
-boundary intentional.
-
-See `docs/getting-started.md` for setup instructions for both paths.
+See `docs/getting-started.md` for setup instructions. See `docs/self-hosted-setup.md` for Tier 2/3 infrastructure detail (Docker Compose, Gitea, Gitea Actions runner, vault migration).
 
 ## 🛠️ Tool roles
 
@@ -182,8 +172,8 @@ start a session with: *"project: second-brain-setup — help me personalize this
 — the agent reads the project context and walks you through it. Or jump straight to
 your own projects.
 
-**Add later — local-first path:** VS Code, [Continue.dev extension](https://continue.dev),
-[Ollama](https://ollama.com), Python 3.8+, self-hosted Gitea
+**Add later — Tier 2/3 (private inference):** [LiteLLM](https://litellm.ai),
+[Ollama](https://ollama.com), self-hosted Gitea (Tier 2: VPS · Tier 3: own hardware)
 
 See `docs/getting-started.md` for the full walkthrough and model recommendations.
 
@@ -193,7 +183,7 @@ See `docs/getting-started.md` for the full walkthrough and model recommendations
 - [Obsidian](https://obsidian.md) — reading, navigation, and mobile layer
 - [obsidian-git](https://github.com/Vinzent03/obsidian-git) — git sync for mobile
 - [Foam](https://foambubble.github.io/foam/) — VS Code wikilink and graph extension
-- [Continue.dev](https://continue.dev) — open-source AI coding assistant (local-first path)
+- [LiteLLM](https://litellm.ai) — LLM gateway (Anthropic API → Ollama translation layer)
 - [Ollama](https://ollama.com) — local LLM runtime
 
 The goal was never better notes. It was better work — and a system smart enough to make you better at what you do.

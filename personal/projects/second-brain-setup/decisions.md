@@ -54,12 +54,11 @@ created: 2026-04-24
 
 ---
 
-## D16 — 2026-04-30 — Continue.dev + Ollama chosen as local-first AI tool; slash command parity as design goal *(note: "Tier 2" in this entry = Tier 3 in the three-tier model, see D21)*
+## D16 — 2026-04-30 — Claude Code + LiteLLM gateway chosen as local-first AI path
 
-**Decision:** Continue.dev is the local-first AI path alongside Claude Code. Every Claude Code slash command (`.claude/commands/`) has a Continue.dev equivalent (`.continue/prompts/`). Slash command parity is the primary reason Continue.dev was chosen over Cline.
-**Why:** A second brain captures sensitive content — the local-first path must not degrade the workflow relative to the cloud path. Cline has no native slash command equivalent; workflows would degrade to conversational prompts. Continue.dev's slash command support enables identical command invocation across both paths. (R4)
-**Alternatives considered:** Cline — rejected; no native slash command equivalent. Single-path setup — rejected; forces privacy compromise on one class of content.
-**Tradeoffs accepted:** Continue.dev has no hooks equivalent — context loading is manual (prompt templates), not auto-injected. System changes must account for both paths.
+**Decision:** Claude Code is the AI interface at all three deployment tiers. For Tier 2 and Tier 3, `ANTHROPIC_BASE_URL` redirects Claude Code's Anthropic Messages API calls to a LiteLLM proxy, which translates to Ollama's OpenAI-compatible API. The harness (hooks, slash commands, context injection, conversation saving) is unaffected — only the inference backend changes.
+**Why:** A local-first path must preserve the full harness to be a genuine alternative for sensitive content. A translation proxy is unavoidable — Claude Code speaks Anthropic Messages API; Ollama speaks OpenAI-compatible API. LiteLLM is the minimal, one-liner solution for this translation. The result is a single tool at all three deployment tiers, with inference backend as the only variable. (R4)
+**Alternatives considered:** A custom FastAPI proxy — rejected; LiteLLM is simpler to install and more tested for this pairing. Accept degraded workflow for local path — rejected; context would not be injected, commands would not fire, which defeats the purpose of a second brain at Tier 2/3.
 
 ---
 

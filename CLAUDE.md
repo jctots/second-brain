@@ -6,11 +6,11 @@
 
 This second brain uses the **PARA method** across **three contexts**:
 
-| Context         | Audience        | Nature                                     |
-| --------------- | --------------- | ------------------------------------------ |
-| `personal/`     | Self and family | Private — life, health, finances, family   |
-| `professional/` | Professional    | Private — career, current job, clients     |
-| `public/`       | Anyone          | Shareable — open source, writing, learning |
+| Context         | Audience        | Nature                                      | Rules                                                                                                                                   |
+| --------------- | --------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `personal/`     | Self and family | Private — life, health, finances, family    | Treat all content as private. **Default context** — use unless there is a reason to choose otherwise.                                   |
+| `professional/` | Professional    | Private — career, current job, clients      | Treat all content as private. For current employer / company work only — not job search or CV (those live in `personal/`).              |
+| `public/`       | Anyone          | Shareable — open source, writing, learning  | Content may eventually be published — write with a reader in mind. Do not embed personal details, employer names, or private decisions. Use only when content is intended for sharing or publishing — not merely because it isn't sensitive. |
 
 Each context has the same PARA structure:
 
@@ -33,6 +33,35 @@ Each context has the same PARA structure:
 | `_self/`          | AI-maintained profile and behavioral reflection about the user         |
 | `_templates/`     | Note templates — each file is self-documenting with usage instructions |
 | `_tests/`         | Tests for scripts and hook budget enforcement                          |
+
+## PARA lifecycle
+
+### Transitions
+
+| From | To | Trigger |
+|---|---|---|
+| `projects/` | `areas/` | Defining goal met; ongoing responsibility remains |
+| `projects/` | `archive/` | Defining goal met; no ongoing responsibility |
+| `areas/` | `archive/` | Responsibility ends entirely |
+| `projects/` or `areas/` | `resources/` | Never directly — extract stable knowledge via `/distill` instead |
+
+**What creates each category:**
+- `projects/` — user intent: an active goal with a horizon
+- `areas/` — a completed project whose responsibility continues, or an explicitly recognized ongoing responsibility with no current goal
+- `resources/` — extracted from conversations or mature project/area docs via `/distill`
+- `archive/` — completed or abandoned items from any category
+
+**projects/ vs. areas/ test:** Ask *"Is there a defining goal I'm still working toward?"* If yes → `projects/`. Long-running systems (home lab, second brain) stay in `projects/` as long as there are open goals and active structured work.
+
+### Enforcement
+
+When creating or placing a note, verify the category fits. Flag before writing if it doesn't:
+
+- `projects/` with no defined goal or open question → suggest `areas/`
+- `areas/` with an active bounded goal → suggest `projects/`
+- `projects/` or `areas/` that is pure stable reference → suggest extracting to `resources/` via `/distill`
+
+Flag as: _"This looks like [category] rather than [proposed]. Want me to adjust the path?"_
 
 ## Conventions
 
@@ -91,9 +120,9 @@ Default set for any active project: `index.md`, `CLAUDE.md`, `_memory.md`, `refe
 
 Each active project folder may contain a `_memory.md` file — a running log of what Claude has learned about this project: decisions made, open questions, current status, and relevant context.
 
-**Trigger:** Run `/sync-memory` at any point in a conversation. Steps are defined in `.claude/commands/sync-memory.md`.
+**Trigger:** Run `/remember` at the end of any conversation. Steps are defined in `.claude/commands/remember.md`.
 
-**Reminder:** At the end of each working session, if `_inbox/memory-queue.md` has unprocessed entries, remind the user: _"There are items in the memory queue — run `/sync-memory` to process them."_
+**Reminder:** At the end of each working session, if `_inbox/memory-queue.md` has unprocessed entries, remind the user: _"There are items in the memory queue — run `/remember` to process them."_
 
 ## Context at conversation start
 
@@ -105,19 +134,11 @@ When project names are mentioned in the first message, `_scripts/inject-context.
 
 **Hook verification:** At the start of every conversation, state in one line which project context files were loaded, e.g.: _"Loaded: `personal/projects/second-brain-setup/CLAUDE.md` + `_memory.md`"_. If no project context was injected, say so. This lets you verify hook status without asking.
 
-## Context-specific rules
-
-| Context         | Rules                                                                                                                                   |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `personal/`     | Treat all content as private.                                                                                                           |
-| `professional/` | Treat all content as private. This is for current employer / company work only — not job search or CV (those live in `personal/`).      |
-| `public/`       | Content may eventually be published — write with a reader in mind. Do not embed personal details, employer names, or private decisions. |
-
 ## How to help me
 
 - When I share a note, help me place it in the right context and PARA category
 - `_self/about.md`, `_self/rules.md`, and project context files are auto-injected by hook on the first turn — no need to re-read them unless the hook missed something
-- **Do not write to workspace-scoped memory** (`~/.claude/projects/.../memory/`). All persistent memory for this vault lives in vault files: `_self/about.md` (profile + behavior), `_self/rules.md` (feedback rules), and project `_memory.md` files. Use `/sync-memory` to persist anything worth keeping.
+- **Do not write to workspace-scoped memory** (`~/.claude/projects/.../memory/`). All persistent memory for this vault lives in vault files: `_self/about.md` (profile + behavior), `_self/rules.md` (feedback rules), and project `_memory.md` files. Use `/remember` to persist anything worth keeping.
 - If a project was mentioned but context files are missing, search `{personal,professional,public}/projects/{name}/` and read `CLAUDE.md` and `_memory.md` manually
 - When creating a new note or project file, check `_templates/` first for a relevant template
 - Prefer editing existing notes over creating new ones
@@ -145,6 +166,6 @@ These are independent checks — evaluate both for every observation. A single c
 
 ## Hook injection budget
 
-Each injected file (`_self/about.md`, `_self/rules.md`, project `CLAUDE.md`, project `_memory.md`) has a 9,500-char hard limit; warn at 7,600 (80%). `/housekeeping` checks these. `/sync-memory` flags after each write.
+Each injected file (`_self/about.md`, `_self/rules.md`, project `CLAUDE.md`, project `_memory.md`) has a 9,500-char hard limit; warn at 7,600 (80%). `/maintain` checks these. `/remember` flags after each write.
 
-**Extended section rule:** Files with `<!-- extended -->` must always be edited with Edit, never Write — Write overwrites the extended section. Only content above the marker counts toward the budget. `/sync-memory` may demote items to the extended section or delete stale ones — both are valid.
+**Extended section rule:** Files with `<!-- extended -->` must always be edited with Edit, never Write — Write overwrites the extended section. Only content above the marker counts toward the budget. `/remember` may demote items to the extended section or delete stale ones — both are valid.
