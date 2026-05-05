@@ -9,9 +9,10 @@ How to fork this template and set up your own AI-assisted second brain. Start wi
 |---|---|---|---|
 | Git host | GitHub | Gitea on VPS | Gitea on own hardware |
 | AI inference | Anthropic API | LiteLLM + Ollama (VPS) | LiteLLM + Ollama (own hardware) |
+| Semantic search | Keyword only | Qdrant + embedding model (VPS) | Qdrant + embedding model (own hardware) |
 | Framework CI | GitHub Actions | GitHub Actions | GitHub Actions |
 | Content CI | — | Gitea Actions | Gitea Actions |
-| Hardware required | None | None (VPS subscription) | Own hardware + GPU |
+| Hardware required | None | VPS (GPU recommended) | Own hardware + GPU (recommended) |
 | Data sovereignty | Partial | Inference on user-controlled infra | Full |
 
 Claude Code is the AI interface at every tier — only `ANTHROPIC_BASE_URL` changes. Steps 1–7 below cover Tier 1. See [private-cloud-setup.md](private-cloud-setup.md) for Tier 2 and [self-hosted-setup.md](self-hosted-setup.md) for Tier 3.
@@ -64,7 +65,7 @@ powershell -ExecutionPolicy Bypass -File _scripts/setup.ps1
 ```
 
 What setup does:
-- Reads `infra.yaml` for the list of required VS Code extensions and installs them
+- Reads [`_infrastructure/stack.yaml`](../_infrastructure/stack.yaml) for the list of required VS Code extensions and installs them
 - Configures the save-conversation hook in VS Code settings
 
 
@@ -89,7 +90,7 @@ ollama pull qwen2.5:7b
 ollama pull qwen2.5:32b
 ```
 
-For CPU-only inference (Tier 2 VPS), 7B is the practical ceiling. For GPU hardware (Tier 3), larger models are viable.
+For GPU hardware, larger models (`qwen2.5:32b`) give better reasoning quality. Without a GPU, 7B models are the practical ceiling for reasonable response times.
 
 
 ## 👤 Step 5: Create your profile

@@ -174,9 +174,10 @@ Python scripts callable both from Claude Code hooks and Gitea Actions CI. No ext
 | `inject-rules.py` | Hook (`UserPromptSubmit`) | Inject `_self/rules.md` summary |
 | `inject-context-claude.py` | Hook (`UserPromptSubmit`) | Detect project, inject project `CLAUDE.md` |
 | `inject-context-memory.py` | Hook (`UserPromptSubmit`) | Detect project, inject project `_memory.md` |
-| `save-conversation.py` | Hook (`Stop`, `SessionEnd`) | Save session transcript to `_conversations/` |
-| `index-conversations.py` | CI | Regenerate `_conversations/index.md` |
-| `update-project-indexes.py` | `/maintain`, `/remember` | Update `## files` + `## relevant conversations` in project index.md |
+| `save-conversation.py` | Hook (`Stop`, `SessionEnd`) | Save session transcript to `_conversations/`; scan for event markers; write `events`/`processed` frontmatter |
+| `index-conversations.py` | CI (`generate-artifacts.yml`) | Regenerate `_conversations/index.md` |
+| `update-project-indexes.py` | CI (`generate-artifacts.yml`) | Update `## files` + `## relevant conversations` in project index.md |
+| `generate-pending-events.py` | CI (`generate-artifacts.yml`), `/maintain` | Scan conversations for unprocessed events; write `_conversations/pending-events.md` |
 | `commit.py` | `/sync` (commit option) | Stage → commit → pull rebase → push |
 
 ---
@@ -199,61 +200,68 @@ User opens VSCode → types first message
 
 ```
 Claude finishes responding → Stop hook fires
-  → save-conversation.py → writes _conversations/YYYY/MM/YYYY-MM-DD-{title}.md
+  → save-conversation.py
+      → writes _conversations/YYYY/MM/YYYY-MM-DD-{title}.md
+      → scans assistant text for event markers (🧠 🗂️ ✅ 🔁 📦 📋)
+      → writes events: [...] and processed: [...] to frontmatter
 User pushes to Gitea
-  → Gitea Actions triggers index-conversations.yml
+  → Gitea Actions triggers generate-artifacts.yml
       → index-conversations.py regenerates _conversations/index.md
-      → CI commits result back to main
+      → update-project-indexes.py updates project index.md files
+      → generate-pending-events.py writes _conversations/pending-events.md
+      → CI commits results back to main
 ```
 
-### Queue model
+### Event marker model
 
-Two inboxes capture candidates during and after conversations:
+During a conversation, the AI emits inline markers when capture-worthy moments occur. Each marker includes a one-line description. `save-conversation.py` scans for these markers and writes two frontmatter fields:
 
-- `_inbox/distill-queue.md` — topics worth turning into durable `resources/` notes
-- `_inbox/memory-queue.md` — project state changes, decisions, profile facts, behavioral feedback
+- `events: [...]` — event types that occurred (`memory`, `distill`, `task`)
+- `processed: [...]` — event types that were actioned (`remember`, `distill`, `task`)
 
-Each entry carries a `context:` snippet sufficient to act on without re-reading the source conversation.
+**Markers emitted by AI:**
 
-**Writers** (add to queues, never consume):
-- Root `CLAUDE.md` instructions — mid-conversation, opportunistic
-- `/remember` — retrospective scan of the current conversation at session end
-- `/maintain` — retrospective scan of unprocessed conversations during vault audit
+| Marker | Event type | Trigger |
+|---|---|---|
+| `🧠 [memory event]` | `memory` | Project state change, key decision, profile fact, behavioral observation |
+| `🗂️ [distill event]` | `distill` | Lasting reference value: technology analysis, tool comparisons, design patterns |
+| `✅ [task event]` | `task` | Concrete next action for the user |
 
-**Consumers** (process and remove from queues):
-- `/remember` — processes memory queue entries from the current conversation only
-- `/distill` — processes memory queue entries from all other conversations; processes distill queue interactively
+**Processed markers (emitted by slash commands):**
+
+| Marker | Processed type | Emitted by |
+|---|---|---|
+| `🔁 [remember processed]` | `remember` | `/remember` |
+| `📦 [distill processed]` | `distill` | `/distill` |
+| `📋 [task processed]` | `task` | `/remember` (when task events found) |
+
+`_conversations/pending-events.md` (CI-generated) lists conversations where `events` has items not yet in `processed`. Used by `/maintain` as a backstop for missed sessions.
 
 ### `/remember` (user-triggered, end of session)
 
 ```
 User runs /remember
-  → scans current conversation for missed distill candidates → appends to distill queue
-  → scans current conversation for missed memory candidates → appends to memory queue
-  → reads memory queue, filters to current conversation entries only
-      → groups by target file, consolidates using context snippets
-      → writes updates using Edit (never Write)
-      → removes processed entries from queue
-  → updates _self/about.md / _self/rules.md if new facts or corrections observed
-  → prepends to decisions.md if an architectural decision was made
-  → runs budget check if any file was written
+  → scans current conversation for 🧠 markers
+      → routes each to target file (_memory.md, decisions.md, _self/about.md, _self/rules.md)
+      → writes using Edit (never Write)
+  → scans current conversation for ✅ markers
+      → routes tasks to project roadmap.md or _memory.md next actions
+  → emits 🔁 [remember processed] (always)
+  → emits 📋 [task processed] (if task events found)
 ```
 
 ### `/distill` (user-triggered, periodic)
 
 ```
 User runs /distill
-  → reads memory queue for entries from other conversations (not current session)
-      → processes and removes them (no conversation re-reads unless snippet insufficient)
-  → reads _inbox/distill-queue.md
-  → for each pending entry:
-      → reads source conversation file
+  → scans current conversation for 🗂️ markers
+  → for each event:
       → drafts note content (structured, concise — resources/)
       → presents: proposed path + draft content + placement reason
       → iterates with user until confirmed or skipped
       → on confirm: writes note (Edit if exists, Write if new); updates dashboard.md
-      → on skip: leaves entry in queue unchanged
-  → removes only confirmed distill entries from queue
+      → on skip: moves to next item
+  → emits 📦 [distill processed]
 ```
 
 ---
@@ -352,7 +360,8 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 3. Strips `<system-reminder>` blocks; formats `<ide_opened_file>` and `<ide_selection>` tags
 4. Formats tool calls as compact blockquotes
 5. Merges consecutive assistant segments
-6. Writes to `_conversations/YYYY/MM/YYYY-MM-DD-{ai-title-as-slug}.md`
+6. Scans assistant text for event markers (🧠 🗂️ ✅) and processed markers (🔁 📦 📋)
+7. Writes to `_conversations/YYYY/MM/YYYY-MM-DD-{ai-title-as-slug}.md` with `events` and `processed` frontmatter fields
 
 **Known behavior:** Fires on every `Stop` — partial conversations are saved incrementally and overwritten with the same filename.
 
@@ -374,7 +383,8 @@ Project `_memory.md` files may contain a `<!-- extended -->` marker. Inject scri
 
 | Workflow | CI | Trigger | What it does |
 |---|---|---|---|
-| `index-conversations.yml` | Gitea Actions | Push to `main` when `_conversations/*.md` changes | Runs `index-conversations.py`, commits updated `_conversations/index.md` |
+| `generate-artifacts.yml` | Gitea Actions | Push to `main` | Runs `index-conversations.py`, `update-project-indexes.py`, `generate-pending-events.py`; commits updated indexes and `pending-events.md` |
+| `test.yml` | Gitea Actions | Push to `main` | Runs `test_r6_hook_budget.py` |
 | Framework tests | GitHub Actions | Push to public fork | Runs `_tests/` against framework files only |
 
 ---
@@ -428,10 +438,11 @@ Location: `.claude/commands/`
 
 | Command | When to use |
 |---|---|
-| `/remember` | End of session — retrospective scan + process memory queue for current conversation |
-| `/distill` | Periodic — process orphaned memory queue entries + distill queue into `resources/` notes |
-| `/maintain` | Periodic vault audit — budgets, structure, PARA lifecycle, inbox aging, queue retrospective |
+| `/remember` | End of session — process 🧠 and ✅ event markers from current conversation into memory/task targets |
+| `/distill` | Periodic — process 🗂️ event markers from current conversation into `resources/` notes |
+| `/maintain` | Periodic vault audit — 4 options: generate artifacts, pending events, reports, reviews |
 | `/sync` | Git operations — commit staged work, check or pull framework updates |
+| `/search` | Query vault by meaning (Tier 2/3 semantic via Qdrant) or keyword (Tier 1 ripgrep) |
 | `/contribute` | Contribute framework improvements to upstream GitHub |
 
 Adding a new command: create `.claude/commands/{name}.md`. No registration required. Avoid names that conflict with built-in Claude Code skills — built-ins take precedence on name collision.
@@ -448,7 +459,8 @@ Adding a new command: create `.claude/commands/{name}.md`. No registration requi
 | Load project `CLAUDE.md` | Hook (`inject-context-claude.py`) | Guaranteed if project name in first message |
 | Load project `_memory.md` | Hook (`inject-context-memory.py`) | Guaranteed if project name in first message |
 | Extended context footer signal | Inject scripts | Guaranteed when marker present |
-| Regenerate conversation + project indexes | Gitea Actions | Guaranteed on push to main |
+| Regenerate conversation + project indexes | Gitea Actions (`generate-artifacts.yml`) | Guaranteed on push to main |
+| Generate `pending-events.md` | Gitea Actions (`generate-artifacts.yml`) | Guaranteed on push to main |
 | Infer context and confirm with user | CLAUDE.md instruction | Unreliable |
 | `/remember` trigger | User-invoked slash command | Reliable — user-triggered; session-scoped |
 | `/distill` trigger | User-invoked slash command | Reliable — user-triggered; cross-session |
@@ -470,14 +482,30 @@ LiteLLM is a proxy that translates Claude Code's Anthropic Messages API format (
 
 ### Configuration
 
+**Requires Anthropic API key auth.** `ANTHROPIC_BASE_URL` only works when authenticating via `ANTHROPIC_API_KEY` (from [console.anthropic.com](https://console.anthropic.com)). It is incompatible with claude.ai subscription (OAuth) — do not set these variables if you authenticate via `claude login`.
+
 Two environment variables redirect Claude Code to the gateway:
 
 ```bash
+export ANTHROPIC_API_KEY=sk-ant-...             # Anthropic Console API key
 export ANTHROPIC_BASE_URL=http://localhost:4000  # LiteLLM endpoint
-export ANTHROPIC_AUTH_TOKEN=sk-your-litellm-key
+export ANTHROPIC_AUTH_TOKEN=sk-your-litellm-key  # LiteLLM key
 ```
 
-Unset both (or remove from the shell profile) to return to the Anthropic API. The harness is model-agnostic and unaffected by this switch.
+Unset `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` (keep `ANTHROPIC_API_KEY`) to return to the Anthropic API directly. The harness is model-agnostic and unaffected by this switch.
+
+---
+
+### Model switching
+
+With the gateway fixed, switch between Claude and local models using the `--model` flag — LiteLLM routes by model name to the backends defined in `_infrastructure/litellm_config.yaml`:
+
+```bash
+claude --model claude-sonnet-4-6   # routes to Anthropic via LiteLLM
+claude --model llama3              # routes to local Ollama via LiteLLM
+```
+
+For a persistent default, add `"model": "claude-sonnet-4-6"` to `.claude/settings.local.json`.
 
 ---
 
@@ -561,7 +589,7 @@ A community fork is any other instance — structurally identical to your instan
 ### Framework vs. content split
 
 **Framework paths** (public, flow to/from the upstream):
-`_scripts/` · `_templates/` · `.claude/` · `infra.yaml` · `_tests/` · root `CLAUDE.md`
+`_scripts/` · `_templates/` · `.claude/` · `_infrastructure/` · `_tests/` · root `CLAUDE.md`
 Plus: second-brain-setup SE docs (`personal/projects/second-brain-setup/` excluding per-instance files)
 
 **Content paths** (private, never leave your instance):

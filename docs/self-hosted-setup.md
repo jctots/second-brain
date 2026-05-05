@@ -12,6 +12,7 @@ See [private-cloud-setup.md](private-cloud-setup.md) for Tier 2 (same stack on a
 |---|---|---|
 | Git host | GitHub | Gitea (own hardware) |
 | AI inference | Anthropic API | LiteLLM + Ollama (own hardware) |
+| Semantic search | — | Qdrant + embedding model (own hardware) |
 | Framework CI | GitHub Actions | GitHub Actions |
 | Content CI | — | Gitea Actions |
 | Hardware required | None | Own hardware + GPU (recommended) |
@@ -29,69 +30,30 @@ Both tiers use Claude Code — the only difference is `ANTHROPIC_BASE_URL`. Tier
 
 ## 🐳 Docker Compose
 
-Create a `docker-compose.yml` in a convenient location outside your vault (e.g., `~/infra/`):
-
-```yaml
-services:
-  gitea:
-    image: gitea/gitea:latest
-    container_name: gitea
-    environment:
-      - USER_UID=1000
-      - USER_GID=1000
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-      - "2222:22"
-    volumes:
-      - gitea-data:/data
-
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama-data:/root/.ollama
-
-  litellm:
-    image: ghcr.io/berriai/litellm:main-latest
-    container_name: litellm
-    restart: unless-stopped
-    ports:
-      - "4000:4000"
-    environment:
-      - LITELLM_MASTER_KEY=${LITELLM_KEY}
-    command: --model ollama/qwen2.5:7b --port 4000
-    depends_on:
-      - ollama
-
-  gitea-runner:
-    image: gitea/act_runner:latest
-    container_name: gitea-runner
-    restart: unless-stopped
-    environment:
-      - GITEA_INSTANCE_URL=http://gitea:3000
-      - GITEA_RUNNER_REGISTRATION_TOKEN=${RUNNER_TOKEN}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      - gitea
-
-volumes:
-  gitea-data:
-  ollama-data:
-```
-
-Set your LiteLLM key in a `.env` file next to `docker-compose.yml`:
+The canonical compose file is at [`_infrastructure/docker-compose.yml`](../_infrastructure/docker-compose.yml) in the framework. Copy the `_infrastructure/` folder to a convenient location outside your vault (e.g., `~/_infrastructure/`):
 
 ```bash
-LITELLM_KEY=sk-your-key-here
-RUNNER_TOKEN=  # fill in after Gitea is configured — see Gitea Actions section
+cp _infrastructure/docker-compose.yml _infrastructure/.env.example ~/_infrastructure/
+cd ~/infra && cp .env.example .env
 ```
 
-The runner token is set after Gitea is configured — see the Gitea Actions section below.
+Services included:
+
+| Service | Image | Purpose |
+|---|---|---|
+| `gitea` | `gitea/gitea` | Private git host for your vault |
+| `ollama` | `ollama/ollama` | LLM and embedding model runtime (GPU enabled by default) |
+| `litellm` | `ghcr.io/berriai/litellm` | Anthropic-compatible API gateway |
+| `qdrant` | `qdrant/qdrant` | Vector store for semantic search |
+| `gitea-runner` | `gitea/act_runner` | Gitea Actions CI runner |
+
+Edit `.env`:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...        # from console.anthropic.com
+LITELLM_KEY=sk-your-key-here        # LiteLLM master key — set to any strong secret
+RUNNER_TOKEN=                        # fill in after Gitea is configured — see Gitea Actions section
+```
 
 Start Gitea and Ollama first (LiteLLM depends on Ollama being ready):
 
@@ -103,7 +65,7 @@ Verify:
 - Gitea: `http://localhost:3000`
 - Ollama: `http://localhost:11434` (returns `{"message":"Ollama is running"}`)
 
-> If hosting on a home server or VPS, replace `localhost` with your machine's IP or domain throughout.
+> If hosting on a home server, replace `localhost` with your machine's IP or domain throughout.
 
 
 ## ⚙️ Set up Gitea
@@ -138,13 +100,13 @@ ssh -p 2222 -T git@localhost
 
 ## ⚡ Gitea Actions
 
-Gitea Actions uses the same workflow syntax as GitHub Actions. The workflows in `.gitea/workflows/` are already configured and run automatically once a runner is active.
+Gitea Actions uses the same workflow syntax as GitHub Actions. The workflows in [`.gitea/workflows/`](../.gitea/workflows/) are already configured and run automatically once a runner is active.
 
 ### What Gitea Actions handles
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `index-conversations.yml` | Push to `main` when `_conversations/` changes | Regenerates `_conversations/index.md` |
+| [`generate-artifacts.yml`](../.gitea/workflows/generate-artifacts.yml) | Push to `main` | Regenerates `_conversations/index.md`, project indexes, and `_conversations/pending-events.md` |
 
 These workflows read your note content directly — that is why they run on Gitea, not GitHub. GitHub Actions runs only on the public framework fork, which never has access to your content.
 
@@ -209,18 +171,112 @@ docker compose up -d litellm
 Verify LiteLLM is running: `curl http://localhost:4000/health` should return OK.
 
 
+## 🔍 Semantic search (RAG)
+
+Tier 3 adds semantic search across your vault — notes surface by meaning, not just keyword. Two modes:
+
+- **Active query:** run `/search "topic"` in a Claude Code session — returns ranked notes
+- **Passive surfacing:** a hook automatically injects relevant notes into context at the start of each turn
+
+Both require Qdrant (already in the Docker Compose above) and an embedding model in Ollama.
+
+### Pull an embedding model
+
+```bash
+docker exec -it ollama ollama pull nomic-embed-text
+```
+
+`nomic-embed-text` is a good default — 768-dimension vectors, runs well on GPU or CPU. If your hardware supports it, `mxbai-embed-large` gives higher quality. The embedding model runs alongside your inference model — both serve requests from the same Ollama container.
+
+### Index your vault
+
+Run the indexer once manually to seed Qdrant:
+
+```bash
+python _scripts/embed-vault.py
+```
+
+This walks all vault `.md` files, chunks them by heading section, embeds each chunk, and upserts into Qdrant with metadata (file path, PARA category, context, project, tags from frontmatter). A full index of a typical vault takes a few minutes.
+
+Set these environment variables before running (or add to your shell profile):
+
+```bash
+export QDRANT_URL=http://localhost:6333
+export OLLAMA_EMBED_MODEL=nomic-embed-text   # match what you pulled above
+export OLLAMA_URL=http://localhost:11434
+```
+
+### Automatic indexing on push
+
+The Gitea Actions workflow `.gitea/workflows/embed-vault.yml` runs `embed-vault.py` automatically when `.md` files change on push — incrementally, only re-indexing changed files. No manual re-indexing needed after the first run.
+
+For the runner to reach Qdrant, add the env vars as Gitea Actions secrets (**Site Administration → Actions → Secrets**):
+
+| Secret | Value |
+|---|---|
+| `QDRANT_URL` | `http://qdrant:6333` (internal Docker network) |
+| `OLLAMA_EMBED_MODEL` | `nomic-embed-text` |
+| `OLLAMA_URL` | `http://ollama:11434` (internal Docker network) |
+
+### Enable passive surfacing
+
+Register the RAG hook in `.claude/settings.json` alongside the existing context injection hooks:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      ...existing hooks...,
+      {
+        "matcher": "",
+        "hooks": [{
+          "type": "command",
+          "command": "python _scripts/inject-context-rag.py"
+        }]
+      }
+    ]
+  }
+}
+```
+
+The hook embeds each incoming message, queries Qdrant for the top matching notes (similarity threshold: 0.75), and injects the results as context before Claude sees your message. It degrades gracefully — if Qdrant is unreachable, it outputs nothing and the session continues normally.
+
+### Verify
+
+```bash
+# search manually
+python _scripts/search-vault.py "home lab infrastructure"
+# expected: ranked list of file paths + headings + snippets
+
+# or from inside a Claude Code session
+/search "home lab infrastructure"
+```
+
+Then start a session on a topic you have notes on — relevant notes should appear in Claude's context without asking.
+
+
 ## ⚙️ Configure Claude Code
+
+> **Requires Anthropic API key.** `ANTHROPIC_BASE_URL` only works with `ANTHROPIC_API_KEY` auth (from [console.anthropic.com](https://console.anthropic.com)). Incompatible with claude.ai subscription (OAuth).
 
 Set these in your shell profile (`.bashrc`, `.zshrc`, or PowerShell profile):
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:4000
-export ANTHROPIC_AUTH_TOKEN=sk-your-key-here
+export ANTHROPIC_API_KEY=sk-ant-...             # Anthropic Console API key
+export ANTHROPIC_BASE_URL=http://localhost:4000  # LiteLLM endpoint
+export ANTHROPIC_AUTH_TOKEN=sk-your-key-here     # LiteLLM key
 ```
 
-Restart VS Code. Claude Code routes all inference through LiteLLM → Ollama — nothing reaches Anthropic's API.
+Restart VS Code. Claude Code routes all inference through LiteLLM → Ollama — nothing reaches Anthropic's API directly.
 
-To return to Anthropic: comment out both variables and restart VS Code.
+**Switch models** using the `--model` flag — LiteLLM routes by model name per [`_infrastructure/litellm_config.yaml`](../_infrastructure/litellm_config.yaml):
+
+```bash
+claude --model claude-sonnet-4-6   # Anthropic via LiteLLM
+claude --model llama3              # local Ollama
+```
+
+To return to Anthropic directly: comment out `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` (keep `ANTHROPIC_API_KEY`) and restart VS Code.
 
 
 ## 📱 Configure obsidian-git → Gitea

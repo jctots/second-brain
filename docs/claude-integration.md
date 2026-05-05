@@ -2,7 +2,7 @@
 
 How Claude Code fits into this second brain — hook architecture, slash commands, the context injection budget, and where judgment replaces automation.
 
-Claude Code is the AI interface at every deployment tier. For Tier 2/3 (private inference), set `ANTHROPIC_BASE_URL` to point at a LiteLLM gateway — the hooks and slash commands described here work identically regardless of where inference happens. See [private-cloud-setup.md](private-cloud-setup.md) and [self-hosted-setup.md](self-hosted-setup.md).
+Claude Code is the AI interface at every deployment tier. For Tier 2/3 (private inference), set `ANTHROPIC_BASE_URL` to point at a LiteLLM gateway — the hooks and slash commands described here work identically regardless of where inference happens. **Requires Anthropic API key auth** (`ANTHROPIC_API_KEY` from console.anthropic.com) — incompatible with claude.ai subscription (OAuth). See [private-cloud-setup.md](private-cloud-setup.md) and [self-hosted-setup.md](self-hosted-setup.md).
 
 > For Tier 1 (Anthropic API): session context is sent to Anthropic's servers. Read [PRIVACY.md](../PRIVACY.md) before using Claude Code with sensitive content.
 
@@ -14,7 +14,8 @@ Claude Code supports hooks that execute shell commands at specific lifecycle eve
 | Event | When it fires |
 |---|---|
 | `UserPromptSubmit` | Before Claude processes each user message |
-| `Stop` | After Claude finishes a session |
+| `Stop` | After Claude finishes each response turn |
+| `SessionEnd` | When the session closes |
 
 ### UserPromptSubmit hooks (context injection)
 
@@ -30,9 +31,11 @@ Four hooks fire on the first message of every conversation:
 
 Each hook is a separate entry in `.claude/settings.json` so each gets its own independent Claude Code output budget (see below).
 
-### Stop hook (session saving)
+### SessionEnd hook (session saving)
 
 **`save-conversation.py`** — saves the session transcript as a Markdown file in `_conversations/YYYY/MM/`. Adds YAML frontmatter (`title`, `session`, `context`, `projects`) for later indexing.
+
+The same script is also registered on `Stop` as a fallback — in case the session closes without a clean `SessionEnd` (e.g. process kill), the last response turn still saves the transcript.
 
 
 ## 💰 Context injection budget
@@ -48,7 +51,7 @@ The budget for this system:
 | `UserPromptSubmit` #3 | `inject-context-claude.py` | 7,600 chars | 9,500 chars |
 | `UserPromptSubmit` #4 | `inject-context-memory.py` | 7,600 chars | 9,500 chars |
 
-Each script has its own independent budget — splitting files into separate hooks gives each a full 9,500-char limit instead of sharing one budget. The warn threshold (80%) is enforced by `_tests/test_r6_hook_budget.py` in CI.
+Each script has its own independent budget — splitting files into separate hooks gives each a full 9,500-char limit instead of sharing one budget. The warn threshold (80%) is enforced by [`_tests/test_r6_hook_budget.py`](../_tests/test_r6_hook_budget.py) in CI.
 
 ### The extended section pattern
 
@@ -66,10 +69,10 @@ Active. Working on X.
 <!-- extended -->
 
 ## Archived decisions
-- (older items demoted here by /sync-memory)
+- (older items demoted here by /remember)
 ```
 
-This lets you keep a single file with full context available on demand (read the file manually) while keeping the injected summary bounded. `/sync-memory` demotes lower-priority content below the marker rather than deleting it.
+This lets you keep a single file with full context available on demand (read the file manually) while keeping the injected summary bounded. `/remember` demotes lower-priority content below the marker rather than deleting it.
 
 ### Verifying hook health
 
@@ -86,36 +89,36 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 
 ### /remember
 
-**Purpose:** End-of-session retrospective — scan the current conversation for missed candidates, then process the memory queue.
+**Purpose:** End-of-session processing — act on 🧠 memory and ✅ task markers emitted during the conversation.
 
 **How it works:**
-1. Scans the current conversation for missed distill candidates → appends to `_inbox/distill-queue.md`
-2. Scans for missed memory candidates → appends to `_inbox/memory-queue.md`
-3. Reads the memory queue, filters to current-conversation entries, groups by target file
-4. Writes the minimal update to each target using Edit (never Write — preserves extended sections)
-5. Removes processed entries; runs a budget check on any file written
+1. Scans the current conversation for 🧠 markers → routes each to the correct target file (`_memory.md`, `decisions.md`, `_self/about.md`, `_self/rules.md`)
+2. Scans for ✅ markers → routes tasks to the project's `roadmap.md` or next-actions section
+3. Writes updates using Edit (never Write — preserves extended sections)
+4. Emits `🔁 [remember processed]` and `📋 [task processed]` markers, saved to conversation frontmatter
 
 **When to run:** At the end of any session with significant decisions or state changes.
 
 ### /distill
 
-**Purpose:** Process pending queues into durable vault notes.
+**Purpose:** Process 🗂️ distill markers from the current conversation into durable vault notes.
 
-**How it works:** Two phases:
-1. Reads `_inbox/memory-queue.md` for entries from *other* conversations (not current session) — processes and removes them without re-reading source conversations
-2. Reads `_inbox/distill-queue.md` interactively, one entry at a time: reads source conversation, drafts note content, presents proposed path + draft for review; on confirm writes to `resources/` and updates `dashboard.md`; skipped entries remain
+**How it works:**
+1. Scans the current conversation for 🗂️ markers
+2. For each event: drafts note content, presents proposed path + draft for review; on confirm writes to `resources/` and updates `dashboard.md`; skipped entries move to the next
+3. Emits `📦 [distill processed]` marker, saved to conversation frontmatter
 
-**When to run:** Periodically — when queues have accumulated entries from multiple sessions.
+**When to run:** Periodically — when distill events have accumulated in recent sessions.
 
 ### /maintain
 
-**Purpose:** Periodic vault health audit.
+**Purpose:** Periodic vault health audit — four options.
 
-**What it checks:**
-- Hook injection budgets — flags files approaching the 9,500-char limit
-- PARA lifecycle — identifies notes that may be miscategorised
-- Inbox aging — flags items sitting in `_inbox/` too long without processing
-- Queue retrospective — checks for queue entries that reference deleted conversations
+**What it covers:**
+- **Generate artifacts** — run all scripts locally, same as CI
+- **Pending events** — surface and process missed events from past conversations via `_conversations/pending-events.md`
+- **Reports** — structural audit, PARA lifecycle, inbox aging, conversation frontmatter gaps
+- **Reviews** — memory file staleness, `_self/` consolidation, budget management
 
 ### /sync
 
@@ -130,6 +133,18 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 **Purpose:** Contribute framework improvements from your instance to the upstream repository.
 
 **What it does:** Packages framework-path changes (scripts, templates, workflows, commands) into a branch and opens a PR to the upstream GitHub repo. Content paths are never included.
+
+### /search
+
+**Purpose:** Query your vault by meaning (Tier 2/3) or keyword (Tier 1).
+
+**How it works:**
+- **Tier 2/3 (semantic):** Embeds the query via Ollama, searches Qdrant, returns top results ranked by similarity — file path, heading, and a short snippet per result
+- **Tier 1 (keyword):** Falls back to ripgrep across all vault `.md` files
+
+**When to run:** Any time you want to surface related notes. Passive surfacing (hook-based) happens automatically at session start — `/search` is the active, on-demand complement.
+
+**Requires:** Qdrant running and vault indexed (`python _scripts/embed-vault.py`) for semantic mode. Keyword mode has no additional requirements.
 
 
 ## ⚖️ The judgment / automation line
@@ -147,10 +162,10 @@ The system draws a deliberate line between what Claude does and what scripts do:
 
 ## 🌱 How `_self/` files grow
 
-**`_self/about.md`** — Claude maintains this across sessions via `/sync-memory`. Growth policy:
+**`_self/about.md`** — Claude maintains this across sessions via `/remember`. Growth policy:
 
 - New behavioral observations are **merged into existing bullets** rather than appended (if a bullet already covers the observation, it's updated in place)
-- When the `## Reflection` section exceeds ~20 bullets, `/sync-memory` re-clusters them into labeled sub-groups
+- When the `## Reflection` section exceeds ~20 bullets, `/remember` re-clusters them into labeled sub-groups
 
 **`_self/rules.md`** — grows from corrections and confirmed preferences, not observations. Claude saves a rule when you correct an approach ("don't do X") or explicitly confirm a non-obvious one ("yes, keep doing that"). Each rule includes a `Why:` and `How to apply:` line so edge cases can be reasoned about, not just followed blindly. Rules are never appended automatically — they require an explicit signal from you.
 

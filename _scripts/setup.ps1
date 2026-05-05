@@ -1,16 +1,16 @@
 # Setup script for Windows.
-# Reads infra.yaml and ensures the correct Python version and VS Code extensions are installed.
+# Reads _infrastructure/stack.yaml and ensures the correct Python version and VS Code extensions are installed.
 # Run from repo root: .\_scripts\setup.ps1
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path $PSScriptRoot -Parent
-$infra = "$repoRoot\infra.yaml"
+$infra = "$repoRoot\_infrastructure\stack.yaml"
 $infraContent = Get-Content $infra -Raw
 
-# --- parse Python version from infra.yaml ---
+# --- parse Python version from _infrastructure/stack.yaml ---
 if ($infraContent -notmatch 'version:\s*"?(\d+\.\d+[\.\d]*)"?') {
-    Write-Error "Could not read python.version from infra.yaml"
+    Write-Error "Could not read python.version from _infrastructure/stack.yaml"
     exit 1
 }
 $requiredVersion = $Matches[1]

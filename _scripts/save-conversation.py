@@ -8,6 +8,19 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 
+EVENT_MARKERS = {
+    "🧠 [memory event]": "memory",
+    "🗂️ [distill event]": "distill",
+    "✅ [task event]": "task",
+}
+
+PROCESSED_MARKERS = {
+    "🔁 [remember processed]": "remember",
+    "📦 [distill processed]": "distill",
+    "📋 [task processed]": "task",
+}
+
+
 def format_user_text(text):
     text = re.sub(
         r"(?s)<ide_opened_file>The user opened the file (.+?) in the IDE\.[^<]*</ide_opened_file>",
@@ -88,6 +101,26 @@ def extract_projects_from_transcript(msg_order, msg_data) -> list:
                         found.append(name)
 
     return found
+
+
+def extract_events_from_transcript(msg_order, msg_data):
+    events = []
+    processed = []
+    for uid in msg_order:
+        msg = msg_data[uid]
+        if msg["role"] != "assistant":
+            continue
+        for seg in msg.get("segments", []):
+            if seg["t"] != "text":
+                continue
+            text = seg["v"]
+            for marker, event_type in EVENT_MARKERS.items():
+                if marker in text and event_type not in events:
+                    events.append(event_type)
+            for marker, proc_type in PROCESSED_MARKERS.items():
+                if marker in text and proc_type not in processed:
+                    processed.append(proc_type)
+    return events, processed
 
 
 def clean_project_name(p: str) -> str:
@@ -252,6 +285,9 @@ def main():
     for name in extracted:
         if name not in proj_list:
             proj_list.append(name)
+
+    events, processed = extract_events_from_transcript(msg_order, msg_data)
+
     filename = f"{date}-{slug}.md"
     yaml_title = title.replace('"', '\\"')
     updated = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
@@ -262,6 +298,12 @@ def main():
         f'title: "{yaml_title}"',
         f"session: {session_id}",
         f"projects: {json.dumps(proj_list)}",
+    ]
+    if events:
+        parts.append(f"events: {json.dumps(events)}")
+    if processed:
+        parts.append(f"processed: {json.dumps(processed)}")
+    parts += [
         "---",
         "",
         f"# {title}",

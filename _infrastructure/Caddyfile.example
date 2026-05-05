@@ -1,0 +1,3 @@
+ai.yourdomain.com {
+    reverse_proxy litellm:4000
+}

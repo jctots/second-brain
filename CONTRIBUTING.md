@@ -11,12 +11,12 @@ The root of this repository has three distinct groups:
 _conversations/    ← framework: saved session transcripts
 _daily/            ← framework: time-indexed daily notes
 _inbox/            ← framework: capture zone
+_infrastructure/   ← framework: stack manifest (stack.yaml) + Docker Compose for Tier 2/3
 _scripts/          ← framework: automation and hook scripts
 _self/             ← framework: AI-maintained profile files
 _templates/        ← framework: note templates
 _tests/            ← framework: script and hook budget tests
 .claude/           ← framework: Claude Code hooks and slash commands
-.continue/         ← framework: Continue.dev config
 .obsidian/         ← framework: Obsidian config (workspace state gitignored)
 .vscode/           ← framework: VS Code settings
 personal/          ← content: private life, health, finances
@@ -52,10 +52,7 @@ upstream merges will never overwrite your customization — your content policy 
 `git diff` before opening a PR — if anything under `personal/`, `professional/`, or
 `public/` appears, do not include it.
 
-**Additional safety net — `/contribute`:** If you use an AI coding assistant (Claude Code
-or Continue.dev), the `/contribute` slash command adds a second layer: it scans your
-changes, filters to framework-only paths, flags anything that looks like content, and
-prepares a PR description for review. It does not open a PR without your approval.
+**Additional safety net — `/contribute`:** If you use Claude Code, the `/contribute` slash command adds a second layer: it scans your changes, filters to framework-only paths, flags anything that looks like content, and prepares a PR description for review. It does not open a PR without your approval.
 
 ## 🔄 Getting upstream updates
 
@@ -76,7 +73,7 @@ Review the merge carefully — some files (`CLAUDE.md`, `personal/projects/secon
 Use the [bug report template](https://github.com/jctots/second-brain/issues/new?template=bug_report.md). Include:
 - What you were trying to do
 - What happened vs. what you expected
-- Your OS, Python version, and VS Code / Continue.dev version
+- Your OS, Python version, and VS Code / Claude Code version
 
 ### Suggest a feature
 
@@ -103,4 +100,4 @@ For significant changes, open an issue first to discuss before putting in the wo
 - A product with a support SLA
 - Seeking feature parity with Obsidian, Notion, or similar tools
 
-See the [comparison](README.md#️-how-this-compares) and [roadmap](docs/roadmap.md) for where this project is and isn't going.
+See the [comparison](README.md#️-how-this-compares) and [evolution](docs/evolution.md) for where this project is and isn't going.
