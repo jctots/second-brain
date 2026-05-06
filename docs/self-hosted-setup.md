@@ -4,6 +4,7 @@ How to add Gitea, LiteLLM, and Ollama on your own hardware alongside your existi
 
 See [getting-started.md](getting-started.md) for the Tier 1 setup this builds on.
 See [private-cloud-setup.md](private-cloud-setup.md) for Tier 2 (same stack on a rented VPS — no local hardware required).
+For system architecture and component interfaces, see [architecture.md](../personal/projects/second-brain-setup/architecture.md).
 
 
 ## 🏗️ What Tier 3 adds
@@ -108,7 +109,7 @@ Gitea Actions uses the same workflow syntax as GitHub Actions. The workflows in 
 |---|---|---|
 | [`generate-artifacts.yml`](../.gitea/workflows/generate-artifacts.yml) | Push to `main` | Regenerates `_conversations/index.md`, project indexes, and `_conversations/pending-events.md` |
 
-These workflows read your note content directly — that is why they run on Gitea, not GitHub. GitHub Actions runs only on the public framework fork, which never has access to your content.
+These workflows read your note content directly — that is why they run on Gitea, not GitHub. GitHub Actions runs only on the public framework fork, which never has access to your content. See [architecture.md — A2](../personal/projects/second-brain-setup/architecture.md#a2--gitea-actions-workflows) for the CI design rationale.
 
 ### Register the runner
 
@@ -257,7 +258,7 @@ Then start a session on a topic you have notes on — relevant notes should appe
 
 ## ⚙️ Configure Claude Code
 
-> **Requires Anthropic API key.** `ANTHROPIC_BASE_URL` only works with `ANTHROPIC_API_KEY` auth (from [console.anthropic.com](https://console.anthropic.com)). Incompatible with claude.ai subscription (OAuth).
+> **Requires Anthropic API key.** `ANTHROPIC_BASE_URL` only works with `ANTHROPIC_API_KEY` auth (from [console.anthropic.com](https://console.anthropic.com)). Incompatible with claude.ai subscription (OAuth). See [architecture.md — LiteLLM gateway interface](../personal/projects/second-brain-setup/architecture.md#litellm-gateway-interface) for the full gateway design.
 
 Set these in your shell profile (`.bashrc`, `.zshrc`, or PowerShell profile):
 

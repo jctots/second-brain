@@ -1,6 +1,6 @@
 # 🤖 Claude Code Integration
 
-How Claude Code fits into this second brain — hook architecture, slash commands, the context injection budget, and where judgment replaces automation.
+How Claude Code fits into this second brain — hook architecture, slash commands, the context injection budget, and where judgment replaces automation. For component interfaces and data flows, see [architecture.md](../personal/projects/second-brain-setup/architecture.md).
 
 Claude Code is the AI interface at every deployment tier. For Tier 2/3 (private inference), set `ANTHROPIC_BASE_URL` to point at a LiteLLM gateway — the hooks and slash commands described here work identically regardless of where inference happens. **Requires Anthropic API key auth** (`ANTHROPIC_API_KEY` from console.anthropic.com) — incompatible with claude.ai subscription (OAuth). See [private-cloud-setup.md](private-cloud-setup.md) and [self-hosted-setup.md](self-hosted-setup.md).
 
@@ -9,33 +9,20 @@ Claude Code is the AI interface at every deployment tier. For Tier 2/3 (private 
 
 ## 🪝 Hook architecture
 
-Claude Code supports hooks that execute shell commands at specific lifecycle events. This system uses two event types:
+Claude Code supports hooks that execute shell commands at specific lifecycle events. This system uses `UserPromptSubmit` (before Claude processes a message) and `Stop`/`SessionEnd` (after Claude responds, for conversation saving).
 
-| Event | When it fires |
+Four hooks fire on the first message of every conversation — each as a separate `.claude/settings.json` entry so each gets its own independent injection budget:
+
+| Hook | Injects |
 |---|---|
-| `UserPromptSubmit` | Before Claude processes each user message |
-| `Stop` | After Claude finishes each response turn |
-| `SessionEnd` | When the session closes |
+| `inject-profile.py` | `_self/about.md` — your profile and behavioral reflection |
+| `inject-rules.py` | `_self/rules.md` — feedback and corrections that persist across sessions |
+| `inject-context-claude.py` | Detected project's `CLAUDE.md` — matched from project name in your first message |
+| `inject-context-memory.py` | Detected project's `_memory.md` — current state, open questions, key decisions |
 
-### UserPromptSubmit hooks (context injection)
+`save-conversation.py` runs on `Stop`/`SessionEnd` — saves the session transcript to `_conversations/YYYY/MM/` with YAML frontmatter including event markers.
 
-Four hooks fire on the first message of every conversation:
-
-**`inject-profile.py`** — reads `_self/about.md` and prints its content to stdout. Claude Code captures this output and prepends it to Claude's context. This gives Claude a persistent profile and behavioral reflection about you, accumulated across sessions.
-
-**`inject-rules.py`** — reads `_self/rules.md` and prints its content. This file holds feedback and behavioral corrections you've given the AI — it ensures corrections persist across sessions without having to repeat them.
-
-**`inject-context-claude.py`** — detects which project you're working on by scanning your first message for folder names that match projects under `personal/`, `professional/`, or `public/projects/`. When it finds a match, it prints that project's `CLAUDE.md`.
-
-**`inject-context-memory.py`** — same project-matching logic; prints that project's `_memory.md` (current state, open questions, key decisions).
-
-Each hook is a separate entry in `.claude/settings.json` so each gets its own independent Claude Code output budget (see below).
-
-### SessionEnd hook (session saving)
-
-**`save-conversation.py`** — saves the session transcript as a Markdown file in `_conversations/YYYY/MM/`. Adds YAML frontmatter (`title`, `session`, `context`, `projects`) for later indexing.
-
-The same script is also registered on `Stop` as a fallback — in case the session closes without a clean `SessionEnd` (e.g. process kill), the last response turn still saves the transcript.
+For component interfaces and data flows, see [architecture.md — Claude Code interface](../personal/projects/second-brain-setup/architecture.md#claude-code-interface).
 
 
 ## 💰 Context injection budget
@@ -55,24 +42,9 @@ Each script has its own independent budget — splitting files into separate hoo
 
 ### The extended section pattern
 
-`_memory.md` files may contain an `<!-- extended -->` marker. The inject scripts strip everything at and below this marker before printing — only content above the marker counts toward the budget.
+`_memory.md` files may contain an `<!-- extended -->` marker — inject scripts strip everything at and below it, keeping the injected summary bounded while preserving full history in the file. `/remember` demotes lower-priority content below the marker rather than deleting it.
 
-```markdown
-# _memory.md
-
-## Current status
-Active. Working on X.
-
-## Key decisions
-- Chose Y over Z because...
-
-<!-- extended -->
-
-## Archived decisions
-- (older items demoted here by /remember)
-```
-
-This lets you keep a single file with full context available on demand (read the file manually) while keeping the injected summary bounded. `/remember` demotes lower-priority content below the marker rather than deleting it.
+See [architecture.md — A1](../personal/projects/second-brain-setup/architecture.md#a1--extended-section-pattern) for the full pattern with example.
 
 ### Verifying hook health
 
@@ -149,15 +121,7 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 
 ## ⚖️ The judgment / automation line
 
-The system draws a deliberate line between what Claude does and what scripts do:
-
-| Claude | Scripts |
-|---|---|
-| Commit message drafting | Git pull, commit, push |
-| Project classification (which context/project) | Index file generation |
-| Memory updates (what's worth keeping) | Frontmatter field updates |
-
-**The rule:** if a step requires no judgment, it's a script. If it does, it's Claude.
+If a step requires no judgment, it's a script. If it does, it's Claude. See [architecture.md — Boundaries and ownership](../personal/projects/second-brain-setup/architecture.md#boundaries-and-ownership) for the full breakdown.
 
 
 ## 🌱 How `_self/` files grow
@@ -187,6 +151,4 @@ The goal for both: the injected summary stays bounded and useful while remaining
 
 ## 🔒 Privacy and inference tiers
 
-At Tier 1, any file Claude Code reads is sent to Anthropic's API — keep that boundary intentional. Read [PRIVACY.md](../PRIVACY.md).
-
-At Tier 2/3, set `ANTHROPIC_BASE_URL` to a LiteLLM gateway pointing at Ollama. Claude Code's behaviour is identical — hooks fire, slash commands work, conversations are saved — but inference stays on user-controlled infrastructure. See [private-cloud-setup.md](private-cloud-setup.md) (VPS) or [self-hosted-setup.md](self-hosted-setup.md) (own hardware).
+See [PRIVACY.md](../PRIVACY.md) for data handling at each tier. For how the LiteLLM gateway integrates at Tier 2/3, see [architecture.md — LiteLLM gateway interface](../personal/projects/second-brain-setup/architecture.md#litellm-gateway-interface).
