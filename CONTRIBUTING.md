@@ -35,6 +35,24 @@ README.md          ← repo: project overview
 **Content folders** are your PARA contexts — the actual notes live here.
 **Repo files** exist for GitHub and contributors; they travel with the template but are not part of the note-taking workflow.
 
+## 📖 Documentation levels
+
+Three levels. Each has a distinct audience and purpose.
+
+| Level | Files | Audience | Purpose |
+|---|---|---|---|
+| 1 | `README.md` | Anyone landing on the repo | Hook — what it is, why it exists, whether to keep reading |
+| 2 | `docs/`, `CONTRIBUTING.md`, `PRIVACY.md` | Users and contributors | How to use it, set it up, and contribute |
+| 3 | [`personal/projects/second-brain-setup/architecture.md`](personal/projects/second-brain-setup/architecture.md) | Implementers and forks | How it is built — components, interfaces, data flows |
+
+### Change propagation
+
+Framework files (`_scripts/`, `.claude/`, `_templates/`, `docs/`, `CONTRIBUTING.md`, etc.) travel to the upstream via `/contribute`. Two files from the sbs project also travel: `architecture.md` and `requirements.md`.
+
+Everything else under `personal/projects/second-brain-setup/` (`_memory.md`, `CLAUDE.md`, `decisions.md`, `roadmap.md`, `index.md`) is instance-specific and never contributed upstream — `/contribute` blocks them explicitly.
+
+**For fork instances contributing back:** `/contribute` works the same whether you are on Tier 1 (GitHub only) or Tier 2/3 (Gitea + GitHub fork) — the branch always starts fresh from the GitHub remote, so private vault content is never included. One UX note for Tier 1: the PR compare URL opens against your fork's `main` by default — switch the base repo to `jctots/second-brain` before submitting.
+
 ## 🔒 Your content stays local
 
 The `.gitignore` blocks all content paths by default — `personal/**`, `professional/**`,

@@ -60,6 +60,7 @@ created: 2026-04-29
   - [Framework vs. content split](#framework-vs-content-split)
   - [Deployment tiers](#deployment-tiers)
   - [Contribution workflow](#contribution-workflow)
+  - [Documentation structure](#documentation-structure)
 
 ---
 
@@ -655,3 +656,28 @@ git push origin improve/description
 git push upstream HEAD:improve/description
 # open PR → upstream main on GitHub
 ```
+
+### Documentation structure
+
+Three levels. Each serves a different reader.
+
+| Level | Files | Audience | Purpose |
+|---|---|---|---|
+| 1 | `README.md` | Anyone landing on the repo | Hook — what it is, why it exists, whether to keep reading |
+| 2 | `docs/`, `CONTRIBUTING.md`, `PRIVACY.md` | Users and contributors | How to use it, set it up, and contribute |
+| 3 | `architecture.md` (this file) | Implementers and forks | How it is built — components, interfaces, data flows |
+
+**Where to write a given type of information:**
+
+| Adding or changing... | Write here | Also update |
+|---|---|---|
+| What the system is / core behaviors | `README.md` § The solution | — |
+| A new slash command | `README.md` slash commands table | `docs/claude-integration.md` (full description) |
+| Setup steps | `docs/getting-started.md` | — |
+| Hook or context injection behavior | `docs/claude-integration.md` | `architecture.md` if a component interface changes |
+| Privacy / data handling | `PRIVACY.md` | — |
+| Known limitations or roadmap | `docs/evolution.md` | — |
+| Deployment tier detail | `docs/getting-started.md` | `docs/private-cloud-setup.md` or `docs/self-hosted-setup.md` |
+| Repo layout or contribution workflow | `CONTRIBUTING.md` | — |
+| System architecture or component interfaces | `architecture.md` (this file) | — |
+| System requirements | `requirements.md` | — |

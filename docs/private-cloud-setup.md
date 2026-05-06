@@ -4,6 +4,7 @@ How to add a private cloud AI path to your second brain. Tier 2 gives you infere
 
 See [getting-started.md](getting-started.md) for the Tier 1 setup this builds on.
 See [self-hosted-setup.md](self-hosted-setup.md) for Tier 3 (same stack on your own hardware).
+For system architecture and component interfaces, see [architecture.md](../personal/projects/second-brain-setup/architecture.md).
 
 
 ## 🏗️ What Tier 2 adds
@@ -90,7 +91,7 @@ For CPU-only inference, 7B models are the practical ceiling for reasonable respo
 
 ## ⚙️ Configure Claude Code
 
-> **Requires Anthropic API key.** `ANTHROPIC_BASE_URL` only works with `ANTHROPIC_API_KEY` auth (from [console.anthropic.com](https://console.anthropic.com)). Incompatible with claude.ai subscription (OAuth).
+> **Requires Anthropic API key.** `ANTHROPIC_BASE_URL` only works with `ANTHROPIC_API_KEY` auth (from [console.anthropic.com](https://console.anthropic.com)). Incompatible with claude.ai subscription (OAuth). See [architecture.md — LiteLLM gateway interface](../personal/projects/second-brain-setup/architecture.md#litellm-gateway-interface) for the full gateway design.
 
 Set these in your shell profile (`.bashrc`, `.zshrc`, or PowerShell profile):
 

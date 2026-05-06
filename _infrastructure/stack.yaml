@@ -13,6 +13,8 @@ client:
       - anthropic.claude-code
       - foam.foam-vscode
       - esbenp.prettier-vscode
+      - james-yu.latex-workshop
+      - codesmith.markdown-inline-editor-vscode
 
 services:
   gitea:
