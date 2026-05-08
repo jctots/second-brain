@@ -49,7 +49,7 @@ Three levels. Each has a distinct audience and purpose.
 
 Framework files (`_scripts/`, `.claude/`, `_templates/`, `docs/`, `CONTRIBUTING.md`, etc.) travel to the upstream via `/contribute`. Two files from the sbs project also travel: `architecture.md` and `requirements.md`.
 
-Everything else under `personal/projects/second-brain-setup/` (`_memory.md`, `CLAUDE.md`, `decisions.md`, `roadmap.md`, `index.md`) is instance-specific and never contributed upstream — `/contribute` blocks them explicitly.
+Everything else under `personal/projects/second-brain-setup/` (`_memory.md`, `CLAUDE.md`, `decisions/`, `roadmap.md`, `index.md`) is instance-specific and never contributed upstream — `/contribute` blocks them explicitly.
 
 **For fork instances contributing back:** `/contribute` works the same whether you are on Tier 1 (GitHub only) or Tier 2/3 (Gitea + GitHub fork) — the branch always starts fresh from the GitHub remote, so private vault content is never included. One UX note for Tier 1: the PR compare URL opens against your fork's `main` by default — switch the base repo to `jctots/second-brain` before submitting.
 

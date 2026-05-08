@@ -64,7 +64,7 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 **Purpose:** End-of-session processing — act on 🧠 memory and ✅ task markers emitted during the conversation.
 
 **How it works:**
-1. Scans the current conversation for 🧠 markers → routes each to the correct target file (`_memory.md`, `decisions.md`, `_self/about.md`, `_self/rules.md`)
+1. Scans the current conversation for 🧠 markers → routes each to the correct target file (`_memory.md`, `decisions/`, `_self/about.md`, `_self/rules.md`)
 2. Scans for ✅ markers → routes tasks to the project's `roadmap.md` or next-actions section
 3. Writes updates using Edit (never Write — preserves extended sections)
 4. Emits `🔁 [remember processed]` and `📋 [task processed]` markers, saved to conversation frontmatter
@@ -114,7 +114,7 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 - **Tier 2/3 (semantic):** Embeds the query via Ollama, searches Qdrant, returns top results ranked by similarity — file path, heading, and a short snippet per result
 - **Tier 1 (keyword):** Falls back to ripgrep across all vault `.md` files
 
-**When to run:** Any time you want to surface related notes. Passive surfacing (hook-based) happens automatically at session start — `/search` is the active, on-demand complement.
+**When to run:** Any time you want to surface related notes. Passive surfacing (hook-based) injects relevant note titles automatically each turn — `/search` is the active, on-demand complement. When Claude sees a title worth reading in full, it emits a `📖 [retrieve: path]` marker; the hook loads the full note on the next turn.
 
 **Requires:** Qdrant running and vault indexed (`python _scripts/embed-vault.py`) for semantic mode. Keyword mode has no additional requirements.
 

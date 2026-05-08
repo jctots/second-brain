@@ -3,7 +3,7 @@ Template: reference.md
 Use: One reference.md per project. Documents *how* things work — configuration surface,
 external facts, lookup material, stable operational reference.
 Not injected by hooks — read on demand.
-Pairs with decisions.md (*why* things were decided this way).
+Pairs with decisions/ (*why* things were decided this way).
 -->
 
 ---
@@ -19,7 +19,7 @@ created: YYYY-MM-DD
 
 Reference for how this project works.
 
-> For the *why* behind these choices, see [decisions.md](decisions.md).
+> For the *why* behind these choices, see [[decisions/index|decisions/]].
 
 ---
 

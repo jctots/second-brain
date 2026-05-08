@@ -33,11 +33,11 @@ the intelligence layer operating against structured context. Four behaviors work
 
 **Automatic context** — at session start, your profile, behavioral feedback, and project context load via hook scripts. The AI enters each session already knowing who you are and what you're working on. Claude Code reads `CLAUDE.md` files from the directory hierarchy by default — this system adds two things on top: a user profile layer (`_self/about.md`) with no Claude Code equivalent, and intent-based project detection — the right project context loads based on what you mention in your first message, not which folder you opened the terminal in. Context is budget-controlled: each injected file has an enforced size limit so injection cost stays predictable.
 
-**AI-proposed memory** — during sessions, the AI emits 🧠 markers when a decision, project state change, or behavioral pattern is worth keeping, and ✅ markers when a next action surfaces. At session end, `/remember` processes them — you confirm what stays. Memory lives in the vault as plain Markdown: version-controlled, visible in your note editor, and portable across AI tools. This is a deliberate trade-off against the fully-automatic memory built into Claude Code — you keep editorial control and ownership of what gets persisted.
+**AI-proposed memory** — during sessions, the AI emits 🧠 markers when a decision or project state change is worth keeping, 👤 markers when a behavioral pattern or profile fact surfaces, and ✅ markers when a next action surfaces. At session end, `/remember` makes a judgment pass over the full conversation — you confirm what stays. Memory lives in the vault as plain Markdown: version-controlled, visible in your note editor, and portable across AI tools. This is a deliberate trade-off against the fully-automatic memory built into Claude Code — you keep editorial control and ownership of what gets persisted.
 
 **AI-proposed capture** — during sessions, the AI emits 🗂️ markers when something has lasting reference value beyond the current project. Run `/distill` to review proposals — confirm, refine, or skip. Notes accumulate because the system noticed them, not because you remembered to stop and write them.
 
-**Retrieval** — relevant notes surface at session start via RAG. Ask the agent directly with `/search "topic"` to query on demand — semantic search (Tier 2/3) or keyword (Tier 1).
+**Retrieval** — relevant note titles surface automatically each turn via RAG. The AI emits a `📖` marker when full content is worth loading — retrieved on the next turn. Ask on demand with `/search "topic"` — semantic search (Tier 2/3) or keyword (Tier 1). RAG also powers automatic project context injection and duplicate detection during `/distill`.
 
 See [docs/claude-integration.md](docs/claude-integration.md) for the full technical detail.
 
@@ -51,7 +51,7 @@ Storage alone doesn't make it a second brain — a second brain builds. The four
 
 **Deterministic vs. judgment split.** Scripts handle git mechanics, index generation, and file operations. The AI handles commit message drafting, project classification, and memory updates. If a step requires no judgment, it's a script.
 
-**Design rationale as a first-class artifact.** Projects start with a `_memory.md` that captures decisions, constraints, and what was rejected. When reasoning history gets long, it splits into `decisions.md`. The design rationale for this system is captured in [second-brain-setup/decisions.md](personal/projects/second-brain-setup/decisions.md) — the project that designs and maintains the framework itself.
+**Design rationale as a first-class artifact.** Projects start with a `_memory.md` that captures decisions, constraints, and what was rejected. When reasoning history gets long, it splits into a `decisions/` folder of atomic notes. The design rationale for this system is captured in [[second-brain-setup/decisions/index|decisions/]] in the second-brain-setup project — the project that designs and maintains the framework itself.
 
 **Agent-agnostic structure.** Hooks are plain Python scripts and notes are plain Markdown. The AI tool is a choice, not load-bearing infrastructure.
 
@@ -62,6 +62,8 @@ Storage alone doesn't make it a second brain — a second brain builds. The four
 |                         | Cloud AI (Claude, ChatGPT) | Obsidian standalone | This setup            |
 | ----------------------- | -------------------------- | ------------------- | --------------------- |
 | AI context per session  | built-in                   | —                   | via instruction files |
+| Automatic memory        | ✓ (no action needed)       | —                   | —                     |
+| Memory — user-owned, versioned | —                   | —                   | ✓                     |
 | Active capture          | —                          | —                   | ✓ `/distill`          |
 | Active retrieval        | —                          | —                   | ✓ RAG + agent query   |
 | Local files / ownership | —                          | ✓                   | ✓                     |
@@ -92,7 +94,7 @@ Invoked by typing `/command-name` in a Claude Code session. Defined as Markdown 
 
 | Command | When | What |
 |---|---|---|
-| `/remember` | End of session | Process 🧠 and ✅ markers from current conversation into memory and task targets |
+| `/remember` | End of session | Judgment pass over current conversation — persists 🧠 project memory, 👤 profile updates, and ✅ task targets |
 | `/distill` | Periodically | Process 🗂️ markers from current conversation into durable `resources/` notes |
 | `/maintain` | Periodically | Vault health audit — artifacts, pending events, reports, reviews |
 | `/sync` | When committing | Git commit with Claude-drafted message + push |
