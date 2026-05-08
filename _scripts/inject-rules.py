@@ -42,11 +42,6 @@ def main():
     rules_path = cwd / "_self/rules.md"
     if rules_path.exists():
         content = rules_path.read_text(encoding="utf-8")
-        marker = "<!-- extended -->"
-        idx = content.find(marker)
-        if idx != -1:
-            content = content[:idx].rstrip()
-            content += "\n\n_(Extended context available — read `_self/rules.md` for full detail.)_"
         print(f"The following is JC's Claude rules, loaded automatically at session start:\n\n{content}")
 
 

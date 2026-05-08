@@ -9,6 +9,7 @@ from pathlib import Path
 # Maps event type → the processed token that clears it
 EVENT_TO_PROCESSED = {
     "memory": "remember",
+    "profile": "profile",
     "distill": "distill",
     "task": "task",
 }

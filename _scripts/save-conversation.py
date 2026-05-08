@@ -10,12 +10,14 @@ from datetime import datetime, timedelta
 
 EVENT_MARKERS = {
     "🧠 [memory event]": "memory",
+    "👤 [profile event]": "profile",
     "🗂️ [distill event]": "distill",
     "✅ [task event]": "task",
 }
 
 PROCESSED_MARKERS = {
     "🔁 [remember processed]": "remember",
+    "🪪 [profile processed]": "profile",
     "📦 [distill processed]": "distill",
     "📋 [task processed]": "task",
 }

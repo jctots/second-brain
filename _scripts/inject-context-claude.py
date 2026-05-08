@@ -66,13 +66,7 @@ def is_first_turn(transcript_path: str) -> bool:
 
 
 def summary_only(path: Path) -> str:
-    text = path.read_text(encoding="utf-8")
-    marker = "<!-- extended -->"
-    idx = text.find(marker)
-    if idx != -1:
-        summary = text[:idx].rstrip()
-        return summary + f"\n\n_(Extended context available — read `{path.name}` for detail.)_"
-    return text
+    return path.read_text(encoding="utf-8")
 
 
 def main():

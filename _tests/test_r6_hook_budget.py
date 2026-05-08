@@ -2,8 +2,8 @@
 """R6 — Verify hook-injected file sizes stay within per-file budget limits.
 
 Each hook command has an independent ~10k char cap before Claude Code redirects
-output to a file reference instead of injecting it directly. Safe operating limit
-is set to 9,500 chars per file to maintain headroom.
+output to a file reference instead of injecting it directly. Hard limit is 10,000
+chars per file; warn at 8,000 (80%); consolidation target is 5,000 chars.
 
 Exit codes:
   0 — all files within limit (warnings may be printed for files over 80%)
@@ -12,16 +12,13 @@ Exit codes:
 import sys
 from pathlib import Path
 
-EXTENDED_MARKER = "<!-- extended -->"
-LIMIT = 9_500       # hard limit per file — CI fails above this
-WARN_AT = 0.80      # warn when summary reaches 80% of limit
+LIMIT = 10_000      # hard limit per file — CI fails above this
+WARN_AT = 0.80      # warn when file reaches 80% of limit (8,000 chars)
 CONTEXTS = ["personal", "professional", "public"]
 
 
 def summary_length(path: Path) -> int:
-    text = path.read_text(encoding="utf-8")
-    idx = text.find(EXTENDED_MARKER)
-    return len(text[:idx]) if idx != -1 else len(text)
+    return len(path.read_text(encoding="utf-8"))
 
 
 def check(label: str, n: int, failures: list, warnings: list) -> None:

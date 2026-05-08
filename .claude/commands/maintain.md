@@ -27,10 +27,11 @@ Report: what was regenerated and budget output summary.
 
 2. For each pending conversation, one at a time:
    a. Read the conversation file.
-   b. Find all 🧠, 🗂️, and ✅ marker lines and their descriptions.
-   c. For 🧠 and ✅ markers: process as `/remember` would — route to the correct target file and write using Edit.
-   d. For 🗂️ markers: process as `/distill` would — draft note, show proposed path and content, wait for user confirmation before writing.
-   e. On completion: update the conversation file's `processed` frontmatter field using Edit to reflect what was actioned.
+   b. Find all 🧠, 👤, 🗂️, and ✅ marker lines and their descriptions.
+   c. For 🧠 and ✅ markers: process as `/remember` would — append a `<!-- remembered: YYYY-MM-DD -->` block to the project `_memory.md` using Edit.
+   d. For 👤 markers: route to `_self/` — behavioral observations and feedback corrections → `_self/rules.md`; profile facts → `_self/about.md`. Append a `<!-- remembered: YYYY-MM-DD -->` block using Edit.
+   e. For 🗂️ markers: process as `/distill` would — draft note, show proposed path and content, wait for user confirmation before writing.
+   f. On completion: update the conversation file's `processed` frontmatter field using Edit to reflect what was actioned.
 
 3. Run `python _scripts/generate-pending-events.py` to refresh `_conversations/pending-events.md`.
 
@@ -78,14 +79,20 @@ Run all checks and report findings. No edits.
 Read and reason about content. Propose changes — apply only with user confirmation. Always use Edit, never Write.
 
 1. **Memory file review** — find all AI-maintained files: `_self/about.md`, `_self/rules.md`, and each active project's `_memory.md`. For each:
-   - Read the summary section (above `<!-- extended -->`, or full file if no marker)
+   - Read the full file
    - Note last-modified date — flag with ⚠️ if older than 30 days
    - Print content in full, grouped by file. Do not summarize — show raw content.
    - After all files shown, invite the user to identify what needs updating.
 
 2. **`_self/` consolidation** — check `_self/about.md` and `_self/rules.md` for:
+   - Appended `<!-- remembered: YYYY-MM-DD -->` blocks — absorb into the appropriate sections, then remove the raw blocks
    - Duplicate bullets expressing the same trait from different angles — propose merging
    - `## Reflection` exceeding 20 bullets — propose grouping into labeled sub-clusters
-   - Files over 80% of budget — identify candidates for condensing; flag as urgent if over 9,500 chars
+   - Files over 80% of budget (8,000 chars) — identify candidates for condensing; flag as urgent if over 10,000 chars
 
-3. **Project budget management** — for each active project, if `CLAUDE.md` or `_memory.md` exceeds 80% (7,600 chars), identify candidates for demotion. Options: move to extended section or delete if clearly stale.
+3. **Project budget management** — for each active project, if `_memory.md` exceeds 8,000 chars:
+   - Read the full file — distinguish structured sections (current status, open questions) from raw appended blocks (`<!-- remembered: ... -->`)
+   - Consolidate appended blocks into the appropriate sections
+   - Route aging content: key decisions → `decisions.md` (prepend); stable reference → skip or note for `/distill`; superseded items → delete
+   - Target file size after consolidation: ≤ 5,000 chars
+   - Propose the consolidated version for user confirmation before writing
