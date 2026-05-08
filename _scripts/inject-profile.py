@@ -42,11 +42,6 @@ def main():
     about_path = cwd / "_self/about.md"
     if about_path.exists():
         content = about_path.read_text(encoding="utf-8")
-        marker = "<!-- extended -->"
-        idx = content.find(marker)
-        if idx != -1:
-            content = content[:idx].rstrip()
-            content += "\n\n_(Extended context available — read `_self/about.md` for full evidence.)_"
         print(f"The following is JC's profile and behavioral context, loaded automatically at session start:\n\n{content}")
 
 

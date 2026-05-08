@@ -51,7 +51,7 @@ Storage alone doesn't make it a second brain — a second brain builds. The four
 
 **Deterministic vs. judgment split.** Scripts handle git mechanics, index generation, and file operations. The AI handles commit message drafting, project classification, and memory updates. If a step requires no judgment, it's a script.
 
-**Design rationale as a first-class artifact.** Projects start with a `_memory.md` that captures decisions, constraints, and what was rejected. When reasoning history gets long, it splits into `decisions.md`. The design rationale for this system is in `docs/`.
+**Design rationale as a first-class artifact.** Projects start with a `_memory.md` that captures decisions, constraints, and what was rejected. When reasoning history gets long, it splits into `decisions.md`. The design rationale for this system is captured in [second-brain-setup/decisions.md](personal/projects/second-brain-setup/decisions.md) — the project that designs and maintains the framework itself.
 
 **Agent-agnostic structure.** Hooks are plain Python scripts and notes are plain Markdown. The AI tool is a choice, not load-bearing infrastructure.
 
@@ -149,7 +149,7 @@ This framework is built to be used and improved. If you fork it and build someth
 
 **`/contribute`:** The slash command packages your framework-path changes into a branch and prepares a PR description — no manual cherry-picking or content-filtering required.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, content safety guarantees, and how to report bugs or suggest improvements. For system architecture and component interfaces, see [architecture.md](personal/projects/second-brain-setup/architecture.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, content safety guarantees, and how to report bugs or suggest improvements. For system architecture and component interfaces, see [second-brain-setup/architecture.md](personal/projects/second-brain-setup/architecture.md).
 
 
 ## 🙏 Prior art and influences

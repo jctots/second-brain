@@ -152,22 +152,26 @@ Evaluate independently throughout the conversation. A single exchange may trigge
 
 Emit each marker on its own line immediately after the relevant response. Include a one-line description. Do not elaborate or branch the conversation.
 
-**🧠 `[memory event]`** — project state change, key decision, profile fact, behavioral observation.
+**🧠 `[memory event]`** — project state change, key decision, or anything worth persisting to project `_memory.md`.
 Format: `🧠 [memory event]: one-line description`
+
+**👤 `[profile event]`** — profile fact or behavioral observation about the user. Profile facts → `_self/about.md`; behavioral corrections or feedback rules → `_self/rules.md`. Handled by `/remember` inline and `/maintain` option 2 backstop.
+Format: `👤 [profile event]: one-line description`
 
 **🗂️ `[distill event]`** — lasting reference value beyond this project: technology analysis, tool comparisons, design patterns, architectural concepts, mental models. Does not trigger for project-specific decisions or ephemeral details.
 Format: `🗂️ [distill event]: one-line description`
 
-**✅ `[task event]`** — concrete next action identified for the user.
+**✅ `[task event]`** — concrete next action identified for the user. Visual signal only — not routed by `/remember`; use judgment to include task-relevant content in the `_memory.md` block.
 Format: `✅ [task event]: one-line description`
 
-These markers are scanned by `save-conversation.py` and written to the conversation frontmatter as `events: [memory, distill, task]`. `/remember` and `/distill` process events from the current conversation directly. Missed conversations are caught by `/maintain` via `_inbox/pending-events.md` (CI-generated).
+These markers are scanned by `save-conversation.py` and written to the conversation frontmatter as `events: [memory, profile, distill, task]`. `/remember` makes a judgment pass over the current conversation — markers are signals, not the authoritative source. Missed conversations are caught by `/maintain` via `_conversations/pending-events.md` (CI-generated).
 
 **Processed markers** — emit immediately after actioning an event. Scanned by `save-conversation.py` into the `processed` frontmatter field.
 
-- `🔁 [memory event processed]` — emit via `/remember` after writing to a memory target
-- `📋 [task event processed]` — emit via `/remember`, **or emit inline immediately after completing a `✅` task directly in this conversation**
-- `📦 [distill event processed]` — emit via `/distill` after writing to `resources/`
+- `🔁 [remember processed]` — emit via `/remember` only if `_memory.md` was written
+- `🪪 [profile processed]` — emit via `/remember` only if a `_self/` file was written
+- `📋 [task processed]` — emit via `/remember`, **or emit inline immediately after completing a `✅` task directly in this conversation**
+- `📦 [distill processed]` — emit via `/distill` after writing to `resources/`
 
 ## Token and cost awareness
 
@@ -178,6 +182,4 @@ These markers are scanned by `save-conversation.py` and written to the conversat
 
 ## Hook injection budget
 
-Each injected file (`_self/about.md`, `_self/rules.md`, project `CLAUDE.md`, project `_memory.md`) has a 9,500-char hard limit; warn at 7,600 (80%). `/maintain` checks these. `/remember` flags after each write.
-
-**Extended section rule:** Files with `<!-- extended -->` must always be edited with Edit, never Write — Write overwrites the extended section. Only content above the marker counts toward the budget. `/remember` may demote items to the extended section or delete stale ones — both are valid.
+Each injected file (`_self/about.md`, `_self/rules.md`, project `CLAUDE.md`, project `_memory.md`) has a 10,000-char hard limit; warn at 8,000 (80%); consolidation target is 5,000 chars. `/remember` appends — never edits sections in-place. `/maintain` option 4 absorbs appended blocks into proper sections and consolidates to within budget.

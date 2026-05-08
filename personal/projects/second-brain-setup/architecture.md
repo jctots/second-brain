@@ -18,7 +18,7 @@ created: 2026-04-29
 
 | # | Name | Summary | Location |
 |---|---|---|---|
-| A1 | Extended section pattern | Project `_memory.md` files use `<!-- extended -->` to split summary (injected) from lower-priority reference (file-only) | [§ A1](#a1--extended-section-pattern) |
+| A1 | Memory capture model | Vault-native; `/remember` judgment pass; markers as visual + backstop signal; `/maintain` consolidates | [§ A1](#a1--memory-capture-model) |
 | A2 | Gitea Actions workflows | CI owns derived artifacts; local hooks only block bad commits | [§ A2](#a2--gitea-actions-workflows) |
 | A3 | Hook guarantee | If a behavior must happen every session without fail, it needs a hook — instructions are not guaranteed | [§ Claude Code interface](#claude-code-interface) |
 
@@ -41,7 +41,7 @@ created: 2026-04-29
   - [Configuration surface](#configuration-surface)
   - [Hook events](#hook-events)
   - [Configured hooks](#configured-hooks)
-  - [A1 — Extended section pattern](#a1--extended-section-pattern)
+  - [A1 — Memory capture model](#a1--memory-capture-model)
   - [A2 — Gitea Actions workflows](#a2--gitea-actions-workflows)
   - [CLAUDE.md](#claudemd)
   - [Auto-memory](#auto-memory)
@@ -320,7 +320,7 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 **File:** `_scripts/inject-profile.py`
 **Fires on:** Every `UserPromptSubmit`, self-limits to first turn only
 **What it does:** Reads `_self/about.md` and outputs the full file content.
-**Budget:** Summary section ≤ 9,500 chars (warn at 7,600).
+**Budget:** ≤ 10,000 chars (warn at 8,000; consolidation target 5,000).
 
 ---
 
@@ -328,8 +328,8 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 
 **File:** `_scripts/inject-context-claude.py`
 **Fires on:** Every `UserPromptSubmit`, self-limits to first turn only
-**What it does:** Reads `hook_data["prompt"]` (falls back to first user message in transcript). Scans `personal/`, `professional/`, `public/` for any project whose name appears in the message. For each matched project, reads its `CLAUDE.md`, stripping at `<!-- extended -->`.
-**Budget:** Summary section of `CLAUDE.md` ≤ 9,500 chars (warn at 7,600).
+**What it does:** Reads `hook_data["prompt"]` (falls back to first user message in transcript). Scans `personal/`, `professional/`, `public/` for any project whose name appears in the message. For each matched project, reads its `CLAUDE.md`.
+**Budget:** ≤ 10,000 chars (warn at 8,000; consolidation target 5,000).
 
 ---
 
@@ -337,8 +337,8 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 
 **File:** `_scripts/inject-context-memory.py`
 **Fires on:** Every `UserPromptSubmit`, self-limits to first turn only
-**What it does:** Same project-matching logic as above. Reads `_memory.md` for each matched project, stripping at `<!-- extended -->`.
-**Budget:** Summary section of `_memory.md` ≤ 9,500 chars (warn at 7,600).
+**What it does:** Same project-matching logic as above. Reads `_memory.md` for each matched project.
+**Budget:** ≤ 10,000 chars (warn at 8,000; consolidation target 5,000).
 
 ---
 
@@ -346,8 +346,8 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 
 **File:** `_scripts/inject-rules.py`
 **Fires on:** Every `UserPromptSubmit`, self-limits to first turn only
-**What it does:** Reads `_self/rules.md`, strips everything at and below `<!-- extended -->`, outputs the summary section.
-**Budget:** Summary section ≤ 9,500 chars (warn at 7,600).
+**What it does:** Reads `_self/rules.md` and outputs the full file content.
+**Budget:** ≤ 10,000 chars (warn at 8,000; consolidation target 5,000).
 
 ---
 
@@ -368,11 +368,51 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 
 ---
 
-### A1 — Extended section pattern
+### A1 — Memory capture model
 
-Project `_memory.md` files may contain a `<!-- extended -->` marker. Inject scripts strip everything at and below the marker — only the summary section is injected. Content below holds lower-priority reference material: demoted decisions, superseded items.
+#### Design principle
 
-**Edit rule:** always use the Edit tool (targeted replacement) on `_memory.md` files with this marker — Write (full overwrite) would erase the extended section.
+Memory capture is vault-native — all captures land in versioned repo files readable in Obsidian/Foam, not in workspace-scoped side-channel storage.
+
+#### Marker roles
+
+Claude emits visual markers mid-conversation when it notices something worth capturing. Markers serve two purposes: visual signal for the user during the conversation, and detection signal for the `/maintain` backstop when `/remember` was not run.
+
+| Marker | Meaning | Processing |
+|---|---|---|
+| 🧠 `[memory event]` | Project state, decision, open question | `/remember` (normal path) or `/maintain` backstop |
+| ✅ `[task event]` | Concrete next action | Visual only — absorbed into 🧠 if worth persisting |
+| 👤 `[profile event]` | Profile fact or behavioral correction | `/remember` inline (facts → `_self/about.md`, corrections → `_self/rules.md`) or `/maintain` backstop |
+| 🗂️ `[distill event]` | Lasting reference value beyond this project | `/distill` |
+
+#### `/remember` — judgment pass
+
+At session end, `/remember` does a **judgment pass over the current conversation** — the full conversation is already in context, so this has no additional token cost. Claude extracts what's worth saving after the conversation has settled, avoiding intermediate states that may have been contradicted later in the session.
+
+Output: one appended block per target file. Always appends — never edits in-place.
+
+```
+<!-- remembered: YYYY-MM-DD -->
+- [what was captured]
+```
+
+`/remember` writes to project `_memory.md` always, and to `_self/about.md` or `_self/rules.md` when 👤 profile content is present. All target files are append-only — never edits sections in-place. It does not scan markers — the full conversation is the signal.
+
+#### `/maintain` — backstop and consolidation
+
+Two jobs:
+
+**Backstop** — for past conversations where `/remember` was not run, `/maintain` scans 🧠 and 👤 markers. 🧠 markers are appended to `_memory.md`; 👤 markers are routed to `_self/about.md` or `_self/rules.md` with judgment.
+
+**Consolidation** — when `_memory.md` or `_self/` files exceed 8,000 chars, `/maintain` merges appended `<!-- remembered: -->` blocks into the structured sections, routes aging content to `decisions.md` or drops it, and targets ≤ 5,000 chars post-consolidation. Dropped items are intentional — working memory fades.
+
+#### Missed capture coverage
+
+| Failure | Mitigation |
+|---|---|
+| `/remember` not run | Markers → `/maintain` backstop |
+| Marker not emitted | `/remember` judgment pass catches it |
+| Both missed | Acceptable — requires two simultaneous failures |
 
 ---
 
@@ -421,7 +461,7 @@ Context-level files (`personal/CLAUDE.md` etc.) were removed — rules folded in
 
 ### Auto-memory
 
-Workspace-scoped memory (`.claude/projects/.../memory/`) is **not used in this repo** (D94). All persistent memory lives in vault files:
+Workspace-scoped memory (`.claude/projects/.../memory/`) is **not used in this repo**. All persistent memory lives in vault files:
 
 | File | Content | Injected by |
 |---|---|---|
@@ -429,7 +469,7 @@ Workspace-scoped memory (`.claude/projects/.../memory/`) is **not used in this r
 | `_self/rules.md` | Feedback rules and corrections | `inject-rules.py` |
 | project `_memory.md` | Project state + open questions | `inject-context-memory.py` |
 
-These files travel with the repo, are git-versioned, and are readable in Obsidian. Workspace-scoped memory is machine-local and not portable — it was retired for these reasons.
+These files travel with the repo, are git-versioned, and are readable in Obsidian. Workspace-scoped memory is machine-local, not vault-portable, and invisible to Obsidian/Foam — retired for these reasons.
 
 ---
 
@@ -439,7 +479,7 @@ Location: `.claude/commands/`
 
 | Command | When to use |
 |---|---|
-| `/remember` | End of session — process 🧠 and ✅ event markers from current conversation into memory/task targets |
+| `/remember` | End of session — judgment pass over current conversation, appends captures to project `_memory.md` |
 | `/distill` | Periodic — process 🗂️ event markers from current conversation into `resources/` notes |
 | `/maintain` | Periodic vault audit — 4 options: generate artifacts, pending events, reports, reviews |
 | `/sync` | Git operations — commit staged work, check or pull framework updates |
@@ -459,7 +499,7 @@ Adding a new command: create `.claude/commands/{name}.md`. No registration requi
 | Load `_self/rules.md` at session start | Hook (`inject-rules.py`) | Guaranteed — first turn only |
 | Load project `CLAUDE.md` | Hook (`inject-context-claude.py`) | Guaranteed if project name in first message |
 | Load project `_memory.md` | Hook (`inject-context-memory.py`) | Guaranteed if project name in first message |
-| Extended context footer signal | Inject scripts | Guaranteed when marker present |
+| Emit event markers mid-conversation | CLAUDE.md instruction | Unreliable — mitigated by `/remember` judgment pass |
 | Regenerate conversation + project indexes | Gitea Actions (`generate-artifacts.yml`) | Guaranteed on push to main |
 | Generate `pending-events.md` | Gitea Actions (`generate-artifacts.yml`) | Guaranteed on push to main |
 | Infer context and confirm with user | CLAUDE.md instruction | Unreliable |
@@ -553,7 +593,7 @@ Test scripts in `_tests/` verify requirements automatically. They run in Gitea A
 
 | Test | Requirement | What it checks |
 |---|---|---|
-| `test_r6_hook_budget.py` | R6 | Each hook-injected file's summary section: warn at 7,600 chars (80%), fail at 9,500 chars (100%) — checked independently per file |
+| `test_r6_hook_budget.py` | R6 | Each hook-injected file: warn at 8,000 chars (80%), fail at 10,000 chars (100%) — checked independently per file |
 
 Tests are deterministic pass/fail scripts — stdlib Python only (R2), no Claude session required. When a test fails, CI blocks. Add a new test whenever a requirement becomes mechanically checkable.
 

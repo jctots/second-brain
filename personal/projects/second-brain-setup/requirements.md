@@ -83,17 +83,17 @@ The system must not require background services to function.
 
 Claude Code caps each hook command's output independently at ~10,000 characters; output beyond that is redirected to a file reference instead of being injected into context. Each inject script has its own independent budget.
 
-| Hook | File | Warn | Hard limit |
-|---|---|---|---|
-| `inject-profile.py` | `_self/about.md` | 7,600 chars (80%) | 9,500 chars |
-| `inject-rules.py` | `_self/rules.md` | 7,600 chars (80%) | 9,500 chars |
-| `inject-context-claude.py` | project `CLAUDE.md` | 7,600 chars (80%) | 9,500 chars |
-| `inject-context-memory.py` | project `_memory.md` | 7,600 chars (80%) | 9,500 chars |
+| Hook | File | Warn | Hard limit | Consolidation target |
+|---|---|---|---|---|
+| `inject-profile.py` | `_self/about.md` | 8,000 chars (80%) | 10,000 chars | 5,000 chars |
+| `inject-rules.py` | `_self/rules.md` | 8,000 chars (80%) | 10,000 chars | 5,000 chars |
+| `inject-context-claude.py` | project `CLAUDE.md` | 8,000 chars (80%) | 10,000 chars | 5,000 chars |
+| `inject-context-memory.py` | project `_memory.md` | 8,000 chars (80%) | 10,000 chars | 5,000 chars |
 
 **Implications:**
-- Use `<!-- extended -->` marker to preserve detail without inflating the injected payload
-- Summary section of each file is what counts — only content above `<!-- extended -->` is injected
-- Growing content belongs here (`requirements.md`) or in extended sections, not in hook-injected files
+- `/remember` appends timestamped blocks — no in-place editing of sections
+- `/maintain` option 4 consolidates files at the warning threshold, targeting 5,000 chars
+- Aging content routes to `decisions.md`, `resources/`, or is dropped — not preserved in an extended section
 
 **Verified by:** `_tests/test_r6_hook_budget.py` — warns at 80%, fails CI at 100%; runs on every push via `.gitea/workflows/test.yml`
 
