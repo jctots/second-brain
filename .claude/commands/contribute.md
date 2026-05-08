@@ -28,7 +28,7 @@ Filter out content paths — never contribute anything under:
 - `architecture.md`
 - `requirements.md`
 
-Still block from that folder: `_memory.md`, `index.md`, `CLAUDE.md`, `decisions.md`, `roadmap.md` — these are instance-specific.
+Still block from that folder: `_memory.md`, `index.md`, `CLAUDE.md`, `decisions/`, `roadmap.md` — these are instance-specific.
 
 Present the remaining files as a numbered list. For each file, flag with ⚠️ if it may contain instance-specific content — look for: hardcoded paths, personal names, short vault-specific aliases or abbreviations, email addresses, or employer names.
 
@@ -36,15 +36,15 @@ For each ⚠️ flagged file, show its diff against `upstream/main` inline so th
 
 Ask the user to confirm the list, remove files, or cancel before proceeding. Do not continue until the user explicitly confirms.
 
-## Step 2 — Review upstream decisions.md for staleness (conditional)
+## Step 2 — Review upstream decisions/ for staleness (conditional)
 
 **Skip this step** if neither `architecture.md` nor `requirements.md` is in the confirmed file list.
 
-If either is included: run `git show upstream/main:personal/projects/second-brain-setup/decisions.md`
+If either is included: run `git show upstream/main:personal/projects/second-brain-setup/decisions/index.md`
 
-Check whether the contributed changes to `architecture.md` or `requirements.md` conflict with or make stale any existing entry. Flag any stale entries with one line each. Ask the user whether to update `decisions.md` before contributing.
+Check whether the contributed changes to `architecture.md` or `requirements.md` conflict with or make stale any recent upstream decision (scan the index for the last 10–15 entries). Flag any stale entries with one line each. Ask the user whether to add a new decision before contributing.
 
-- If yes: update `personal/projects/second-brain-setup/decisions.md` in your instance, then add it to the confirmed file list.
+- If yes: create a new `decisions/D{n}-{slug}.md` in your instance and add a row to `decisions/index.md` — these stay local and are not contributed.
 - If no (or no stale entries): proceed.
 
 ## Step 3 — Branch name

@@ -1,6 +1,6 @@
 Save context from the current conversation to persistent storage. Execute in order:
 
-1. **Scan the conversation for 👤 profile content** — quickly check whether this conversation contains profile facts or behavioral observations worth persisting to `_self/`. This determines which files to read upfront.
+1. **Scan the conversation for profile content** — quickly check whether this conversation contains profile facts or behavioral observations worth persisting to `_self/`. This determines which files to read upfront.
 
 2. **Read target files upfront** — always read the active project's `_memory.md`. If profile content is likely, also read `_self/about.md` and `_self/rules.md`.
 
@@ -9,7 +9,7 @@ Save context from the current conversation to persistent storage. Execute in ord
    - Open questions that remain unresolved
    - Key decisions with rationale
    - Completed tasks or next actions the user should track
-   - 👤 profile facts → `_self/about.md`; behavioral corrections or feedback rules → `_self/rules.md`
+   - Profile facts → `_self/about.md`; behavioral corrections or feedback rules → `_self/rules.md`
 
    Do not limit to 🧠 or 👤 markers — use your judgment. Markers are visual signals, not the authoritative source.
 

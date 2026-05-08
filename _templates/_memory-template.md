@@ -22,8 +22,8 @@ Brief description of where this project stands right now.
 
 ## Key decisions
 
-<!-- Holding area for decisions until decisions.md is warranted.
-     Create decisions.md when this section gets long or reasoning needs more space. -->
+<!-- Holding area for decisions until decisions/ is warranted.
+     Create decisions/ folder when this section gets long or reasoning needs more space. -->
 - Decision made and why
 
 <!-- Add project-specific sections here if useful -->

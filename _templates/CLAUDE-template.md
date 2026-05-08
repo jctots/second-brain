@@ -27,7 +27,7 @@ Any hard constraints Claude must check before proposing changes. Remove this sec
 | `reference.md` | Inputs, stable facts, lookup material — starts as a brief, grows over time | *What is this / how does it work?* |
 
 Optional files — create when the signal appears, not before:
-- `decisions.md` — when `_memory.md` Key decisions gets long or reasoning exceeds injection budget. Choices between real alternatives, rationale, what was rejected. Newest first.
+- `decisions/` — when `_memory.md` Key decisions gets long. Create a `decisions/` folder with `index.md` (newest-first table) and one file per decision (`D{n}-{slug}.md`, using `_templates/decision-template.md`). To add a new decision: create the file, increment D# from the index, add a row to `index.md`.
 - `roadmap.md` — when next-actions or a backlog outgrows `index.md` or `_memory.md`. Good candidate for a scheduled agent.
 - `requirements.md` + `architecture.md` — only if `reference.md` grows distinct "constraints" and "structure" sections consulted separately. Most projects never reach this.
 
@@ -36,6 +36,6 @@ Optional files — create when the signal appears, not before:
 When sync memory runs and this project is involved:
 
 1. Update `_memory.md` — update existing sections in-place. Do not append new blocks.
-2. If a significant decision was made: prepend an entry to `decisions.md` if it exists, otherwise record it in `_memory.md` under Key decisions.
+2. If a significant decision was made: create `decisions/D{n}-{slug}.md` if `decisions/` exists, otherwise record it in `_memory.md` under Key decisions.
 
 **What qualifies as a decision:** {project-specific guidance — strategy changes, tool choices, design tradeoffs; not routine implementation details}
