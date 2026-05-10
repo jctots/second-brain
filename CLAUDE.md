@@ -144,7 +144,7 @@ When project names are mentioned in the first message, `_scripts/inject-context.
 - When creating a new note or project file, check `_templates/` first for a relevant template
 - Prefer editing existing notes over creating new ones
 - Flag if a note in `_inbox/` has been sitting there too long without processing
-- When a new `areas/` or `resources/` file is created, or a new project is created, update `dashboard.md` — add the wikilink to the correct context section and PARA line
+
 
 ## During-conversation captures
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Regenerates _conversations/index.md from frontmatter of all conversation files.
-# Run from repo root: python _scripts/index-conversations.py
+# Run from repo root: python _scripts/generate-conversation-index.py
 import re
 from pathlib import Path
 from collections import defaultdict
@@ -66,7 +66,7 @@ def main():
         by_month[e["date"][:7]].append(e)
 
     lines = [
-        "<!-- AUTO-GENERATED - do not edit manually. Run _scripts/index-conversations.py to refresh. -->",
+        "<!-- AUTO-GENERATED - do not edit manually. Run _scripts/generate-conversation-index.py to refresh. -->",
         "",
         "# Conversations",
         "",

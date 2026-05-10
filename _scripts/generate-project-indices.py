@@ -1,8 +1,37 @@
 #!/usr/bin/env python3
-# Updates "## files" and "## relevant conversations" sections in all project index.md files.
-# Run from repo root: python _scripts/update-project-indexes.py
+# Generates "## files", "## relevant conversations", and "## quick status" sections in all project index.md files.
+# Run from repo root: python _scripts/generate-project-indices.py
 import re
 from pathlib import Path
+
+
+def parse_quick_status(memory_path):
+    if not memory_path.exists():
+        return None, []
+    lines = memory_path.read_text(encoding="utf-8").splitlines()
+    in_section = False
+    status = None
+    next_items = []
+    in_next = False
+    for line in lines:
+        if re.match(r"^## Quick status\s*$", line, re.IGNORECASE):
+            in_section = True
+            continue
+        if in_section and re.match(r"^## ", line):
+            break
+        if not in_section:
+            continue
+        m = re.match(r"^status:\s*(.+)$", line)
+        if m:
+            status = m.group(1).strip()
+            in_next = False
+            continue
+        if re.match(r"^next:\s*$", line):
+            in_next = True
+            continue
+        if in_next and line.startswith("- "):
+            next_items.append(line[2:].strip())
+    return status, next_items
 
 
 def set_section(lines, heading, new_lines):
@@ -60,7 +89,7 @@ def parse_conv_frontmatter(path):
     return fm
 
 
-def update_index(dir_path, index_path, wl_prefix, conv_entries):
+def update_index(dir_path, index_path, wl_prefix, conv_entries, memory_path=None):
     file_lines = []
     items = sorted(dir_path.iterdir(), key=lambda x: x.name)
 
@@ -82,6 +111,17 @@ def update_index(dir_path, index_path, wl_prefix, conv_entries):
 
     content = index_path.read_text(encoding="utf-8")
     lines = content.splitlines()
+
+    if memory_path is not None:
+        status, next_items = parse_quick_status(memory_path)
+        if status is not None:
+            qs_lines = [f"**status:** {status}", ""]
+            if next_items:
+                qs_lines += ["**next:**"] + [f"- {item}" for item in next_items]
+            else:
+                qs_lines += ["**next:** —"]
+            lines = set_section(lines, "quick status", qs_lines)
+
     lines = set_section(lines, "files", file_lines)
 
     joined = "\n".join(lines)
@@ -129,7 +169,7 @@ def main():
                 for stem, fm in all_convs
                 if slug in fm["projects"]
             ]
-            update_index(project_dir, project_index, slug, conv_entries)
+            update_index(project_dir, project_index, slug, conv_entries, project_dir / "_memory.md")
             total += 1
 
     print(f"Done. {total} project index(es) updated.")

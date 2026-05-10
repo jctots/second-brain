@@ -13,7 +13,9 @@ Save context from the current conversation to persistent storage. Execute in ord
 
    Do not limit to 🧠 or 👤 markers — use your judgment. Markers are visual signals, not the authoritative source.
 
-4. **Append a `<!-- remembered: YYYY-MM-DD -->` block to each target file** — using Edit (never Write), one edit per file:
+4. **Update `## Quick status` in-place** — if the project's status or next actions have materially changed this session, update the `status:` line and `next:` list directly using Edit. This section is always current-state, never appended to.
+
+5. **Append a `<!-- remembered: YYYY-MM-DD -->` block to each target file** — using Edit (never Write), one edit per file:
 
    ```
    <!-- remembered: YYYY-MM-DD -->
@@ -23,9 +25,9 @@ Save context from the current conversation to persistent storage. Execute in ord
 
    If nothing new is worth persisting beyond what's already in a file, skip that file.
 
-5. **Emit processed markers** — output on separate lines, only for what was actually written:
+6. **Emit processed markers** — output on separate lines, only for what was actually written:
    - `🔁 [remember processed]` only if `_memory.md` was written
    - `🪪 [profile processed]` only if a `_self/` file was written
    - `📋 [task processed]` only if task-relevant content was captured
 
-6. Briefly confirm what was written and what was skipped (one line per file).
+7. Briefly confirm what was written and what was skipped (one line per file).

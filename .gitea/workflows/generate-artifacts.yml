@@ -15,16 +15,19 @@ jobs:
           git config user.email "actions@gitea"
 
       - name: Generate conversation index
-        run: python3 _scripts/index-conversations.py
+        run: python3 _scripts/generate-conversation-index.py
 
       - name: Generate project indexes
-        run: python3 _scripts/update-project-indexes.py
+        run: python3 _scripts/generate-project-indices.py
+
+      - name: Generate dashboard
+        run: python3 _scripts/generate-dashboard.py
 
       - name: Generate pending events
         run: python3 _scripts/generate-pending-events.py
 
       - name: Commit artifacts
         run: |
-          git add _conversations/index.md _conversations/pending-events.md personal/ professional/ public/
+          git add _conversations/index.md _conversations/pending-events.md personal/ professional/ public/ dashboard.md
           git diff --cached --quiet || git commit -m "chore: regenerate indexes and pending events"
           git push
