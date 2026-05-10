@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Claude Code UserPromptSubmit hook — injects project _memory.md on the first turn only.
+import re
 import sys
 import json
 from pathlib import Path
@@ -30,6 +31,41 @@ def get_first_user_message(transcript_path: str) -> str | None:
         except json.JSONDecodeError:
             continue
     return None
+
+
+def get_ide_opened_file(transcript_path: str) -> str | None:
+    path = Path(transcript_path)
+    if not path.exists():
+        return None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+            if entry.get("type") == "user":
+                msg = entry.get("message", {})
+                if isinstance(msg, dict):
+                    for block in msg.get("content", []):
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            m = re.search(r"The user opened the file (.+?) in the IDE", block.get("text", ""))
+                            if m:
+                                return m.group(1).strip()
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
+def find_project_from_file(cwd: Path, file_path: str) -> list[Path]:
+    try:
+        rel = Path(file_path).relative_to(cwd)
+    except ValueError:
+        return []
+    parts = rel.parts
+    if len(parts) >= 3 and parts[0] in CONTEXTS and parts[1] == "projects":
+        project_dir = cwd / parts[0] / "projects" / parts[2]
+        if project_dir.exists():
+            return [project_dir]
+    return []
 
 
 def find_projects_in_message(cwd: Path, message: str) -> list[Path]:
@@ -88,7 +124,12 @@ def main():
 
     if transcript_path:
         message = hook_data.get("prompt", "") or get_first_user_message(transcript_path) or ""
-        for project_dir in find_projects_in_message(cwd, message):
+        projects = find_projects_in_message(cwd, message)
+        if not projects:
+            ide_file = get_ide_opened_file(transcript_path)
+            if ide_file:
+                projects = find_project_from_file(cwd, ide_file)
+        for project_dir in projects:
             memory_md = project_dir / "_memory.md"
             if memory_md.exists():
                 label = f"Project _memory.md auto-loaded for `{project_dir.name}` ({project_dir.parent.parent.name}/projects/):"
