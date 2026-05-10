@@ -86,21 +86,20 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 
 ### /distill
 
-**Purpose:** Process 🗂️ distill markers from the current conversation into durable vault notes.
+**Purpose:** Extract portable concepts into durable `resources/` notes. Two modes:
 
-**How it works:**
-1. Scans the current conversation for 🗂️ markers
-2. For each event: drafts note content, presents proposed path + draft for review; on confirm writes to `resources/` and updates `dashboard.md`; skipped entries move to the next
-3. Emits `📦 [distill processed]` marker, saved to conversation frontmatter
+**Mode 1 — `/distill` (no argument):** Scans the current conversation for 🗂️ markers. For each event: checks for existing notes with overlapping titles or tags, drafts content, presents proposed path + draft for review, writes on confirm. Emits `📦 [distill processed]`.
 
-**When to run:** Periodically — when distill events have accumulated in recent sessions.
+**Mode 2 — `/distill path/to/file.md`:** Mines an existing document for portable concepts. Skips already-distilled sections (marked with `*→ Distilled: [[...]]*`). For each candidate: proposes a `resources/` path, drafts an atomic note, inserts a traceability line in the source file on confirm.
+
+**When to run:** Periodically — when distill events have accumulated, or when a mature project/area doc has stable concepts worth extracting.
 
 ### /maintain
 
 **Purpose:** Periodic vault health audit — four options.
 
 **What it covers:**
-- **Generate artifacts** — run all scripts locally, same as CI
+- **Generate artifacts** — run all scripts locally, same as CI: `generate-conversation-index.py`, `generate-project-indices.py` (injects `## quick status` into each project index), `generate-dashboard.py` (project status table + tag-grouped resource TOC), `generate-pending-events.py`
 - **Pending events** — surface and process missed events from past conversations via `_conversations/pending-events.md`
 - **Reports** — structural audit, PARA lifecycle, inbox aging, conversation frontmatter gaps
 - **Reviews** — memory file staleness, `_self/` consolidation, budget management

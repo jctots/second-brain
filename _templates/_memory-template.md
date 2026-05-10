@@ -16,6 +16,13 @@ On sync memory, Claude updates each section in-place — never appends new block
 > Maintained by Claude. Updated on "sync memory" trigger.
 > Last updated: YYYY-MM-DD
 
+## Quick status
+
+status: One-line summary of where this project stands right now
+next:
+- First next action
+- Second next action
+
 ## Current status
 
 Brief description of where this project stands right now.

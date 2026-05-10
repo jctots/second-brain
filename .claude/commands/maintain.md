@@ -12,8 +12,9 @@ Ask the user which operation:
 ## Option 1 — Generate artifacts
 
 Run all scripts in order:
-- `python _scripts/index-conversations.py`
-- `python _scripts/update-project-indexes.py`
+- `python _scripts/generate-conversation-index.py`
+- `python _scripts/generate-project-indices.py`
+- `python _scripts/generate-dashboard.py`
 - `python _scripts/generate-pending-events.py`
 - `python _tests/test_r6_hook_budget.py`
 
@@ -94,7 +95,7 @@ Read and reason about content. Propose changes — apply only with user confirma
    - Summarize what each note covers
    - Propose one of: merge into one note, extract a shared concept into a new note, or keep separate with a cross-link (`*→ See also: [[...]]*`)
    - Show the proposed change (new or merged content) for user confirmation before writing
-   - On confirm: write using Edit (existing note) or Write (new note); add cross-links where relevant; update `dashboard.md` if a new note is created
+   - On confirm: write using Edit (existing note) or Write (new note); add cross-links where relevant
 
    > **Note:** This step reads all resource notes — token cost scales with vault size. Without RAG (Phase 1), this is the only cross-note similarity mechanism available. Once RAG Phase 1 is complete, replace the full read with a Qdrant similarity query.
 
