@@ -26,8 +26,12 @@ jobs:
       - name: Generate pending events
         run: python3 _scripts/generate-pending-events.py
 
+      - name: Generate PDF sidecars
+        run: pip install pdfplumber marker-pdf && python3 _scripts/generate-pdf-sidecars.py
+
       - name: Commit artifacts
         run: |
           git add _conversations/index.md _conversations/pending-events.md personal/ professional/ public/ dashboard.md
-          git diff --cached --quiet || git commit -m "chore: regenerate indexes and pending events"
+          git ls-files --others --exclude-standard | grep '\.md$' | xargs -r git add
+          git diff --cached --quiet || git commit -m "chore: regenerate indexes, pending events, and PDF sidecars"
           git push

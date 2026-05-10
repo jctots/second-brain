@@ -47,7 +47,7 @@ Present the proposed message and ask: "Confirm, edit, or cancel?"
 ## Option 2 — Check for framework updates
 
 1. Determine remote from argument or auto-detect.
-2. Run `git fetch {remote}`.
+2. Run `git fetch --prune {remote}`.
 3. Run `git log HEAD..{remote}/main --oneline`. If empty, report "Already up to date." and stop.
 4. Report how many commits are ahead and list them.
 
@@ -56,7 +56,7 @@ Present the proposed message and ask: "Confirm, edit, or cancel?"
 ## Option 3 — Pull framework updates
 
 1. Determine remote from argument or auto-detect.
-2. Run `git fetch {remote}`.
+2. Run `git fetch --prune {remote}`.
 3. Run `git log HEAD..{remote}/main --oneline`. If empty, report "Already up to date." and stop.
 4. Show framework-only changed files: `git diff --name-only HEAD {remote}/main`, filtered to exclude content paths (`personal/`, `professional/`, `public/`, `_self/`, `_daily/`, `_conversations/`, `_inbox/`).
 5. Ask the user to confirm the merge before proceeding.
