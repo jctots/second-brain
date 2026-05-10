@@ -9,8 +9,8 @@ Default file set: index.md, CLAUDE.md, _memory.md, reference.md
     let it grow into stable lookup material over time.
 
 Optional files — create when the signal appears, not before:
-  decisions.md — when _memory.md "Key decisions" gets long or reasoning exceeds budget.
-    Content: choices between real alternatives, rationale, what was rejected. Newest first.
+  decisions/ — when _memory.md "Key decisions" gets long. Create a decisions/ folder with
+    index.md (newest-first table) and one file per decision (D{n}-{slug}.md).
   roadmap.md — when next-actions or a skills/research backlog outgrows index.md or _memory.md.
     Good candidate for a scheduled agent (research, progress tracking).
   requirements.md + architecture.md — only if reference.md grows distinct "constraints" and

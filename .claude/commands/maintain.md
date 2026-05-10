@@ -45,7 +45,7 @@ Run all checks and report findings. No edits.
 
 1. **Structural audit** — for each active project under `personal/projects/`, `professional/projects/`, `public/projects/`, check:
    - Has all required files: `index.md`, `CLAUDE.md`, `_memory.md`?
-   - Has significant design history → has `decisions.md`?
+   - Has significant design history → has `decisions/` folder with `index.md`?
    - Has stable operational reference → has `reference.md`?
    - Scan for cross-pollination: note any pattern, convention, or file in one project absent in another where it would be useful.
 
@@ -90,9 +90,17 @@ Read and reason about content. Propose changes — apply only with user confirma
    - `## Reflection` exceeding 20 bullets — propose grouping into labeled sub-clusters
    - Files over 80% of budget (8,000 chars) — identify candidates for condensing; flag as urgent if over 10,000 chars
 
-3. **Project budget management** — for each active project, if `_memory.md` exceeds 8,000 chars:
+4. **Resources consolidation** — read all notes in `resources/` across `personal/`, `professional/`, and `public/`. For each pair or group with overlapping titles, tags, or content:
+   - Summarize what each note covers
+   - Propose one of: merge into one note, extract a shared concept into a new note, or keep separate with a cross-link (`*→ See also: [[...]]*`)
+   - Show the proposed change (new or merged content) for user confirmation before writing
+   - On confirm: write using Edit (existing note) or Write (new note); add cross-links where relevant; update `dashboard.md` if a new note is created
+
+   > **Note:** This step reads all resource notes — token cost scales with vault size. Without RAG (Phase 1), this is the only cross-note similarity mechanism available. Once RAG Phase 1 is complete, replace the full read with a Qdrant similarity query.
+
+5. **Project budget management** — for each active project, if `_memory.md` exceeds 8,000 chars:
    - Read the full file — distinguish structured sections (current status, open questions) from raw appended blocks (`<!-- remembered: ... -->`)
    - Consolidate appended blocks into the appropriate sections
-   - Route aging content: key decisions → `decisions.md` (prepend); stable reference → skip or note for `/distill`; superseded items → delete
+   - Route aging content: key decisions → create `decisions/D{n}-{slug}.md` (increment D# from `decisions/index.md`) and add a row to `decisions/index.md` (newest first); stable reference → skip or note for `/distill`; superseded items → delete
    - Target file size after consolidation: ≤ 5,000 chars
    - Propose the consolidated version for user confirmation before writing

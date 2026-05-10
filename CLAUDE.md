@@ -113,7 +113,7 @@ Default set for any active project: `index.md`, `CLAUDE.md`, `_memory.md`, `refe
 
 `reference.md` is always present — start it with inputs (brief, base repo, concept note) and let it grow into stable lookup material. Create optional files only when the signal appears:
 
-- `decisions.md` — when `_memory.md` "Key decisions" gets long or reasoning exceeds injection budget. Content: choices between real alternatives, rationale, what was rejected. Newest first.
+- `decisions/` — when `_memory.md` "Key decisions" gets long. Create a `decisions/` folder with `index.md` (newest-first table of all decisions) and one file per decision (`D{n}-{slug}.md`, using `_templates/decision-template.md`). To add a new decision: create the file, increment D# from the index, add a row to `index.md`.
 - `roadmap.md` — when next-actions or a skills/research backlog outgrows `index.md` or `_memory.md`. Good candidate for a scheduled agent.
 - `requirements.md` + `architecture.md` — only if `reference.md` grows distinct "constraints" and "structure" sections that are frequently consulted separately. Most projects never need this.
 

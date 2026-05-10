@@ -119,13 +119,13 @@ personal/projects/second-brain-setup/
 ├── CLAUDE.md           ← project instructions
 ├── _memory.md          ← AI-maintained current state and decisions
 ├── index.md            ← project overview
-├── decisions.md        ← your design history, pre-seeded with one entry
+├── decisions/          ← your design history, one atomic note per decision
 ├── requirements.md     ← system requirements
 ├── architecture.md     ← system structure and component interfaces
 └── roadmap.md          ← improvement backlog
 ```
 
-Open `decisions.md` and replace the `{YYYY-MM-DD}` placeholder with today's date. That's your first decision recorded — adopting this template and why.
+Open `decisions/index.md` to see your first decision pre-seeded. Open the linked decision file and replace the `{YYYY-MM-DD}` placeholder with today's date.
 
 When you want additional projects, create them under the appropriate context and copy from the templates:
 
