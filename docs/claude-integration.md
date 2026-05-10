@@ -59,6 +59,19 @@ No announcement = hook miss. This is the passive health check — you don't have
 
 Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-name` in a Claude Code session. Tab-completion lists available commands.
 
+### /init
+
+**Purpose:** Initialize a new vault entry — project, area, or resource.
+
+**How it works:**
+1. Asks three open questions in one message: your goal, your inputs (links, docs, a brief), and any other relevant context
+2. Proposes a classification: PARA category (`projects`, `areas`, or `resources`), context (`personal`, `professional`, or `public`), a kebab-case slug, and a one-line description
+3. Waits for your confirmation or adjustment before writing anything
+4. Creates the entry: a 4-file project folder (`index.md`, `CLAUDE.md`, `_memory.md`, `reference.md`) for projects, or a single file for areas and resources
+5. Updates `dashboard.md` with the new wikilink
+
+**When to run:** Any time you start a new project, recognize a new ongoing responsibility, or want to capture a reference topic.
+
 ### /remember
 
 **Purpose:** End-of-session processing — act on 🧠 memory and ✅ task markers emitted during the conversation.

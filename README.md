@@ -94,6 +94,7 @@ Invoked by typing `/command-name` in a Claude Code session. Defined as Markdown 
 
 | Command | When | What |
 |---|---|---|
+| `/init` | Starting something new | Initialize a project, area, or resource — asks your goal and inputs, proposes a classification, creates files and updates the dashboard |
 | `/remember` | End of session | Judgment pass over current conversation — persists 🧠 project memory, 👤 profile updates, and ✅ task targets |
 | `/distill` | Periodically | Process 🗂️ markers from current conversation into durable `resources/` notes |
 | `/maintain` | Periodically | Vault health audit — artifacts, pending events, reports, reviews |
