@@ -1,6 +1,72 @@
 # --- CLAUDE CODE ---
 .claude/settings.local.json
 
+# ── content paths ─────────────────────────────────────────────────────────────
+# Keeps personal content out of this public framework repo. Keep this section
+# as-is — personal content should never be committed to a public fork.
+#
+# To track personal notes in a private repo alongside this framework:
+#   1. Create a separate private repo (Gitea, GitLab, etc.)
+#   2. Clone it without these blocking entries so personal/ is tracked there
+#   3. Use /contribute to push framework improvements back to this public fork
+#
+# Note: this gitignore only protects against accidental commits when working
+# inside this repo directly. To block direct pushes of personal content from a
+# private vault, enable branch protection on main (require PRs, no direct push).
+
+# ── personal ──────────────────────────────────────────────────────────────────
+personal/**
+
+# preserve PARA skeleton
+!personal/projects/
+!personal/projects/.gitkeep
+!personal/areas/
+!personal/areas/.gitkeep
+!personal/resources/
+!personal/resources/.gitkeep
+!personal/archive/
+!personal/archive/.gitkeep
+
+# preserve second-brain-setup framework files (including blank starters)
+!personal/projects/second-brain-setup/
+!personal/projects/second-brain-setup/**
+
+# ── professional ──────────────────────────────────────────────────────────────
+professional/**
+
+!professional/projects/
+!professional/projects/.gitkeep
+!professional/areas/
+!professional/areas/.gitkeep
+!professional/resources/
+!professional/resources/.gitkeep
+!professional/archive/
+!professional/archive/.gitkeep
+
+# ── public ────────────────────────────────────────────────────────────────────
+public/**
+
+!public/projects/
+!public/projects/.gitkeep
+!public/areas/
+!public/areas/.gitkeep
+!public/resources/
+!public/resources/.gitkeep
+!public/archive/
+!public/archive/.gitkeep
+
+# ── other content paths ───────────────────────────────────────────────────────
+_self/**
+!_self/.gitkeep
+
+_daily/**
+!_daily/.gitkeep
+
+_conversations/**
+
+_inbox/**
+!_inbox/.gitkeep
+
 # --- DESKTOP CONFIG ---
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
