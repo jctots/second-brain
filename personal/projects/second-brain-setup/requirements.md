@@ -10,9 +10,9 @@ created: 2026-04-29
 
 > **What belongs here:** Standing constraints — things that must always be true, independent of implementation. Stated as "the system SHALL..." and testable at any point in time. Doesn't change unless user needs change.
 >
-> **What belongs in `decisions.md`:** Past choices between alternatives, with rationale — "we chose X over Y because Z." Decisions point back to the requirement that motivated them. They may be superseded; requirements don't get superseded, they get revised.
+> **What belongs in `decisions/`:** Past choices between alternatives, with rationale — "we chose X over Y because Z." Decisions point back to the requirement that motivated them. They may be superseded; requirements don't get superseded, they get revised.
 >
-> Related: `decisions.md` (how requirements were met) · `CLAUDE.md` (operational instructions)
+> Related: `decisions/` (how requirements were met) · `CLAUDE.md` (operational instructions)
 
 ---
 
@@ -93,7 +93,7 @@ Claude Code caps each hook command's output independently at ~10,000 characters;
 **Implications:**
 - `/remember` appends timestamped blocks — no in-place editing of sections
 - `/maintain` option 4 consolidates files at the warning threshold, targeting 5,000 chars
-- Aging content routes to `decisions.md`, `resources/`, or is dropped — not preserved in an extended section
+- Aging content routes to `decisions/`, `resources/`, or is dropped — not preserved in an extended section
 
 **Verified by:** `_tests/test_r6_hook_budget.py` — warns at 80%, fails CI at 100%; runs on every push via `.gitea/workflows/test.yml`
 

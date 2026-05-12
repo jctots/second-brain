@@ -34,28 +34,27 @@ def parse_quick_status(memory_path):
     return status, next_items
 
 
-def set_section(lines, heading, new_lines):
+def remove_section(lines, heading):
     escaped = re.escape(heading)
-    sec_start = -1
-    sec_end = len(lines)
     for i, line in enumerate(lines):
-        if re.match(rf"^## {escaped}\s*$", line):
-            sec_start = i
+        if re.match(rf"^## {escaped}\s*$", line, re.IGNORECASE):
+            sec_end = len(lines)
             for j in range(i + 1, len(lines)):
                 if re.match(r"^## ", lines[j]):
                     sec_end = j
                     break
-            break
+            before = lines[:i]
+            while before and not before[-1].strip():
+                before = before[:-1]
+            after = lines[sec_end:]
+            return before + ([""] + after if after else after)
+    return lines
 
-    section = [f"## {heading}", ""] + list(new_lines)
-    if sec_start >= 0:
-        before = lines[:sec_start]
-        after = ([""] + lines[sec_end:]) if sec_end < len(lines) else []
-        return before + section + after
-    else:
-        while lines and not lines[-1].strip():
-            lines = lines[:-1]
-        return lines + [""] + section
+
+def append_section(lines, heading, new_lines):
+    while lines and not lines[-1].strip():
+        lines = lines[:-1]
+    return lines + [""] + [f"## {heading}", ""] + list(new_lines)
 
 
 
@@ -112,6 +111,10 @@ def update_index(dir_path, index_path, wl_prefix, conv_entries, memory_path=None
     content = index_path.read_text(encoding="utf-8")
     lines = content.splitlines()
 
+    has_conv_section = bool(re.search(r"^## relevant conversations\s*$", content, re.MULTILINE | re.IGNORECASE))
+
+    # Compute quick status content before stripping
+    qs_lines = None
     if memory_path is not None:
         status, next_items = parse_quick_status(memory_path)
         if status is not None:
@@ -120,21 +123,25 @@ def update_index(dir_path, index_path, wl_prefix, conv_entries, memory_path=None
                 qs_lines += ["**next:**"] + [f"- {item}" for item in next_items]
             else:
                 qs_lines += ["**next:** —"]
-            lines = set_section(lines, "quick status", qs_lines)
 
-    lines = set_section(lines, "files", file_lines)
+    # Strip all managed sections, then re-append in enforced order
+    for heading in ("quick status", "files", "relevant conversations"):
+        lines = remove_section(lines, heading)
 
-    joined = "\n".join(lines)
-    if conv_entries or "## relevant conversations" in joined:
-        if not conv_entries:
-            conv_lines = ["_No classified conversations yet._"]
-        else:
+    if qs_lines is not None:
+        lines = append_section(lines, "quick status", qs_lines)
+    lines = append_section(lines, "files", file_lines)
+
+    if conv_entries or has_conv_section:
+        if conv_entries:
             sorted_convs = sorted(conv_entries, key=lambda e: e["updated"] or e["date"], reverse=True)
             conv_lines = [
                 "| Date | Conversation |",
                 "|------|--------------|",
             ] + [f"| {e['date']} | [[{e['base']}]] |" for e in sorted_convs]
-        lines = set_section(lines, "relevant conversations", conv_lines)
+        else:
+            conv_lines = ["_No classified conversations yet._"]
+        lines = append_section(lines, "relevant conversations", conv_lines)
 
     new_content = "\n".join(lines).rstrip() + "\n"
     index_path.write_text(new_content, encoding="utf-8")

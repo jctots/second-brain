@@ -81,7 +81,7 @@ def main():
     ]
 
     if pending_entries:
-        lines.append(f"_{len(pending_entries)} conversation(s) with unprocessed events as of {updated}. Run `/remember` or `/distill` to process._")
+        lines.append(f"_{len(pending_entries)} conversation(s) with unprocessed events as of {updated}. Run `/maintain` option 2 to process._")
         lines.append("")
         for e in pending_entries:
             pending_str = ", ".join(e["pending"])

@@ -10,7 +10,7 @@ created: 2026-04-29
 
 > System structure: components, responsibilities, interfaces, and data flows.
 >
-> Related: `requirements.md` (constraints this satisfies) · `decisions.md` (why it was built this way)
+> Related: `requirements.md` (constraints this satisfies) · `decisions/` (why it was built this way)
 
 ---
 
@@ -176,8 +176,9 @@ Python scripts callable both from Claude Code hooks and Gitea Actions CI. No ext
 | `inject-context-claude.py` | Hook (`UserPromptSubmit`) | Detect project, inject project `CLAUDE.md` |
 | `inject-context-memory.py` | Hook (`UserPromptSubmit`) | Detect project, inject project `_memory.md` |
 | `save-conversation.py` | Hook (`Stop`, `SessionEnd`) | Save session transcript to `_conversations/`; scan for event markers; write `events`/`processed` frontmatter |
-| `index-conversations.py` | CI (`generate-artifacts.yml`) | Regenerate `_conversations/index.md` |
-| `update-project-indexes.py` | CI (`generate-artifacts.yml`) | Update `## files` + `## relevant conversations` in project index.md |
+| `generate-conversation-index.py` | CI (`generate-artifacts.yml`), `/maintain` | Regenerate `_conversations/index.md` |
+| `generate-project-indices.py` | CI (`generate-artifacts.yml`), `/maintain` | Regenerate `## files`, `## relevant conversations`, and `## quick status` in each project `index.md` |
+| `generate-dashboard.py` | CI (`generate-artifacts.yml`), `/maintain` | Regenerate `dashboard.md` — `## active projects` table (quick status) + context TOC (resources grouped by cluster tags) |
 | `generate-pending-events.py` | CI (`generate-artifacts.yml`), `/maintain` | Scan conversations for unprocessed events; write `_conversations/pending-events.md` |
 | `commit.py` | `/sync` (commit option) | Stage → commit → pull rebase → push |
 
@@ -207,13 +208,15 @@ Claude finishes responding → Stop hook fires
       → writes events: [...] and processed: [...] to frontmatter
 User pushes to Gitea
   → Gitea Actions triggers generate-artifacts.yml
-      → index-conversations.py regenerates _conversations/index.md
-      → update-project-indexes.py updates project index.md files
+      → generate-conversation-index.py regenerates _conversations/index.md
+      → generate-project-indices.py updates project index.md files (## files, ## relevant conversations, ## quick status)
+      → generate-dashboard.py regenerates dashboard.md (## active projects table + context TOC)
       → generate-pending-events.py writes _conversations/pending-events.md
       → CI commits results back to main
 ```
 
 ### Event marker model
+*→ Distilled: [[public/resources/ai-conversation-event-markers]]*
 
 During a conversation, the AI emits inline markers when capture-worthy moments occur. Each marker includes a one-line description. `save-conversation.py` scans for these markers and writes two frontmatter fields:
 
@@ -243,7 +246,7 @@ During a conversation, the AI emits inline markers when capture-worthy moments o
 ```
 User runs /remember
   → scans current conversation for 🧠 markers
-      → routes each to target file (_memory.md, decisions.md, _self/about.md, _self/rules.md)
+      → routes each to target file (_memory.md, decisions/, _self/about.md, _self/rules.md)
       → writes using Edit (never Write)
   → scans current conversation for ✅ markers
       → routes tasks to project roadmap.md or _memory.md next actions
@@ -369,10 +372,11 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 ---
 
 ### A1 — Memory capture model
+*→ Distilled: [[public/resources/ai-memory-capture-judgment-pass]]*
 
 #### Design principle
 
-Memory capture is vault-native — all captures land in versioned repo files readable in Obsidian/Foam, not in workspace-scoped side-channel storage.
+Memory capture is vault-native — all captures land in versioned repo files readable in Obsidian/Foam, not in workspace-scoped side-channel storage. See [[second-brain-setup/decisions/D124-vault-native-memory-design-markers-judgment-pass-maintain-ba|D124]] for the full rationale vs. workspace memory.
 
 #### Marker roles
 
@@ -404,7 +408,7 @@ Two jobs:
 
 **Backstop** — for past conversations where `/remember` was not run, `/maintain` scans 🧠 and 👤 markers. 🧠 markers are appended to `_memory.md`; 👤 markers are routed to `_self/about.md` or `_self/rules.md` with judgment.
 
-**Consolidation** — when `_memory.md` or `_self/` files exceed 8,000 chars, `/maintain` merges appended `<!-- remembered: -->` blocks into the structured sections, routes aging content to `decisions.md` or drops it, and targets ≤ 5,000 chars post-consolidation. Dropped items are intentional — working memory fades.
+**Consolidation** — when `_memory.md` or `_self/` files exceed 8,000 chars, `/maintain` merges appended `<!-- remembered: -->` blocks into the structured sections, routes aging content to `decisions/` or drops it, and targets ≤ 5,000 chars post-consolidation. Dropped items are intentional — working memory fades.
 
 #### Missed capture coverage
 
@@ -417,6 +421,7 @@ Two jobs:
 ---
 
 ### A2 — Gitea Actions workflows
+*→ Distilled: [[public/resources/ci-vs-local-hooks-design-principle]]*
 
 **Design principle:** prefer CI for derived/generated artifacts; prefer local hooks only for things that must block a bad commit.
 
@@ -424,7 +429,7 @@ Two jobs:
 
 | Workflow | CI | Trigger | What it does |
 |---|---|---|---|
-| `generate-artifacts.yml` | Gitea Actions | Push to `main` | Runs `index-conversations.py`, `update-project-indexes.py`, `generate-pending-events.py`; commits updated indexes and `pending-events.md` |
+| `generate-artifacts.yml` | Gitea Actions | Push to `main` | Runs `generate-conversation-index.py`, `generate-project-indices.py`, `generate-pending-events.py`; commits updated indexes and `pending-events.md` |
 | `test.yml` | Gitea Actions | Push to `main` | Runs `test_r6_hook_budget.py` |
 | Framework tests | GitHub Actions | Push to public fork | Runs `_tests/` against framework files only |
 
@@ -461,7 +466,7 @@ Context-level files (`personal/CLAUDE.md` etc.) were removed — rules folded in
 
 ### Auto-memory
 
-Workspace-scoped memory (`.claude/projects/.../memory/`) is **not used in this repo**. All persistent memory lives in vault files:
+Workspace-scoped memory (`.claude/projects/.../memory/`) is **not used in this repo** (D94, D124). All persistent memory lives in vault files:
 
 | File | Content | Injected by |
 |---|---|---|
@@ -469,7 +474,7 @@ Workspace-scoped memory (`.claude/projects/.../memory/`) is **not used in this r
 | `_self/rules.md` | Feedback rules and corrections | `inject-rules.py` |
 | project `_memory.md` | Project state + open questions | `inject-context-memory.py` |
 
-These files travel with the repo, are git-versioned, and are readable in Obsidian. Workspace-scoped memory is machine-local, not vault-portable, and invisible to Obsidian/Foam — retired for these reasons.
+These files travel with the repo, are git-versioned, and are readable in Obsidian. Workspace-scoped memory is machine-local, not vault-portable, and invisible to Obsidian/Foam — retired for these reasons. See [[second-brain-setup/decisions/D124-vault-native-memory-design-markers-judgment-pass-maintain-ba|D124]] for the full tradeoff analysis.
 
 ---
 
@@ -479,6 +484,7 @@ Location: `.claude/commands/`
 
 | Command | When to use |
 |---|---|
+| `/init` | Initialize a new vault entry — asks goal, inputs, and context; proposes PARA category + slug; creates project folder (4 files) or single area/resource file; updates dashboard |
 | `/remember` | End of session — judgment pass over current conversation, appends captures to project `_memory.md` |
 | `/distill` | Periodic — process 🗂️ event markers from current conversation into `resources/` notes |
 | `/maintain` | Periodic vault audit — 4 options: generate artifacts, pending events, reports, reviews |
@@ -491,6 +497,7 @@ Adding a new command: create `.claude/commands/{name}.md`. No registration requi
 ---
 
 ### Automation reliability summary
+*→ Distilled: [[public/resources/ai-agent-hook-vs-instruction-reliability]]*
 
 | Behavior | Mechanism | Reliability |
 |---|---|---|
@@ -516,6 +523,7 @@ How Claude Code connects to a local or private-cloud Ollama instance — the mec
 ---
 
 ### What it is
+*→ Distilled: [[public/resources/litellm-claude-code-local-model-proxy]]*
 
 LiteLLM is a proxy that translates Claude Code's Anthropic Messages API format (`/v1/messages`) into the OpenAI-compatible format that Ollama exposes. Claude Code's harness — hooks, slash commands, conversation saving, context injection — continues to work unchanged. The only difference is where inference happens.
 
@@ -637,6 +645,7 @@ Plus: second-brain-setup SE docs (`personal/projects/second-brain-setup/` exclud
 `personal/` · `professional/` · `_self/` · `_daily/` · `_conversations/` · `_inbox/`
 
 ### Deployment tiers
+*→ Distilled: [[public/resources/three-tier-deployment-privacy-model]]*
 
 The system supports three deployment tiers, all built from the same upstream framework.
 
@@ -698,6 +707,7 @@ git push upstream HEAD:improve/description
 ```
 
 ### Documentation structure
+*→ Distilled: [[public/resources/three-level-documentation-hierarchy]]*
 
 Three levels. Each serves a different reader.
 

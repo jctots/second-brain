@@ -38,7 +38,14 @@ The budget for this system:
 | `UserPromptSubmit` #3 | `inject-context-claude.py` | 7,600 chars | 9,500 chars |
 | `UserPromptSubmit` #4 | `inject-context-memory.py` | 7,600 chars | 9,500 chars |
 
-Each script has its own independent budget — splitting files into separate hooks gives each a full 9,500-char limit instead of sharing one budget. The warn threshold (80%) is enforced by [`_tests/test_r6_hook_budget.py`](../_tests/test_r6_hook_budget.py) in CI.
+Each script has its own independent budget — splitting files into separate hooks gives each a full 9,500-char limit instead of sharing one budget.
+
+### Budget enforcement
+
+The warn threshold (80%) is enforced in two places:
+
+- **CI** — [`_tests/test_r6_hook_budget.py`](../_tests/test_r6_hook_budget.py) runs on every push to `main` and fails the build if any file exceeds 10,000 chars.
+- **`/remember`** — step 7 of the `/remember` command runs `_tests/test_r6_hook_budget.py` after writing context files and emits `⚠️ [budget warn]` for any file at or above the warn threshold.
 
 ### The extended section pattern
 
