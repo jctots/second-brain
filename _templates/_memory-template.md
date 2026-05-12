@@ -18,6 +18,8 @@ On sync memory, Claude updates each section in-place — never appends new block
 
 ## Quick status
 
+<!-- status: project state at milestone level — must stay accurate between sessions without updates.
+     next: meaningful project actions only — no commit/push/remember housekeeping. -->
 status: One-line summary of where this project stands right now
 next:
 - First next action

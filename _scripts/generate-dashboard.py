@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Generates the project-status table and TOC sections in dashboard.md.
+# Generates the project-status list and TOC sections in dashboard.md.
 # Preserves everything above the first --- separator (manual header).
 # Run from repo root: python _scripts/generate-dashboard.py
 import re
@@ -33,33 +33,6 @@ def parse_quick_status(memory_path):
         if in_next and line.startswith("- "):
             next_items.append(line[2:].strip())
     return status, next_items
-
-
-def generate_project_status(root):
-    rows = []
-    for ctx in ("personal", "professional", "public"):
-        projects_dir = root / ctx / "projects"
-        if not projects_dir.exists():
-            continue
-        for project_dir in sorted(projects_dir.iterdir()):
-            if not project_dir.is_dir():
-                continue
-            status, next_items = parse_quick_status(project_dir / "_memory.md")
-            if status is None:
-                continue
-            slug = project_dir.name
-            wl = f"[[{slug}/index|{slug}]]"
-            next_str = next_items[0] if next_items else "—"
-            rows.append(f"| {wl} | {status} | {next_str} |")
-
-    if not rows:
-        return ["## active projects", "", "_No active projects with quick status._"]
-
-    return (
-        ["## active projects", ""]
-        + ["| Project | Status | Next |", "|---------|--------|------|"]
-        + rows
-    )
 
 
 def parse_frontmatter_tags(file_path):
@@ -101,7 +74,7 @@ def collect_resources(para_dir):
 
 
 def collect_flat(para_dir):
-    """Return flat wikilink list for projects and areas."""
+    """Return flat wikilink list for areas."""
     items = []
     for item in sorted(para_dir.iterdir()):
         if item.is_dir():
@@ -116,6 +89,18 @@ def collect_flat(para_dir):
     return items
 
 
+def collect_projects(para_dir):
+    """Return list of (wikilink, status) tuples for all project dirs."""
+    results = []
+    for item in sorted(para_dir.iterdir()):
+        if not item.is_dir():
+            continue
+        wl = f"[[{item.name}/index|{item.name}]]"
+        status, _ = parse_quick_status(item / "_memory.md")
+        results.append((wl, status))
+    return results
+
+
 def generate_toc(root):
     lines = []
     for ctx in ("personal", "professional", "public"):
@@ -128,13 +113,24 @@ def generate_toc(root):
                 lines.append("")
                 continue
 
-            if para == "resources":
+            if para == "projects":
+                entries = collect_projects(para_dir)
+                if not entries:
+                    lines.append("**projects:** —")
+                    lines.append("")
+                    continue
+                lines.append("**projects:**")
+                for wl, status in entries:
+                    suffix = f" — {status}" if status else ""
+                    lines.append(f"- {wl}{suffix}")
+                lines.append("")
+
+            elif para == "resources":
                 entries = collect_resources(para_dir)
                 if not entries:
                     lines.append("**resources:** —")
                     lines.append("")
                     continue
-                # Group by tag; untagged collected separately
                 tag_map = {}
                 untagged = []
                 for wl, fp in entries:
@@ -152,11 +148,13 @@ def generate_toc(root):
                     lines.append(f"- `#{tag}` — {' · '.join(cluster_tags[tag])}")
                 if other:
                     lines.append(f"- `#other` — {' · '.join(other)}")
-            else:
+                lines.append("")
+
+            else:  # areas
                 items = collect_flat(para_dir)
                 lines.append(f"**{para}:** {' · '.join(items) if items else '—'}")
+                lines.append("")
 
-            lines.append("")
         lines.append("---")
         lines.append("")
 
@@ -179,13 +177,10 @@ def main():
     while manual_header and not manual_header[-1].strip():
         manual_header.pop()
 
-    status_lines = generate_project_status(root)
     toc_lines = generate_toc(root)
 
     new_lines = (
         manual_header
-        + ["", "---", ""]
-        + status_lines
         + ["", "---", ""]
         + toc_lines
     )

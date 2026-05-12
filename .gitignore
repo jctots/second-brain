@@ -1,15 +1,16 @@
-# Ignore the workspace layout (the main culprit of merge conflicts)
+# --- CLAUDE CODE ---
+.claude/settings.local.json
+
+# --- DESKTOP CONFIG ---
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
-
-# Ignore the cache and indexed database
 .obsidian/cache/
 .obsidian/indexedDWB/
+.obsidian/plugins/
 
-# Ignore plugin binaries — Obsidian downloads these automatically
-.obsidian/plugins/*/main.js
-.obsidian/plugins/*/styles.css
-.obsidian/plugins/*/obsidian_askpass.sh
-
-# Optional: Ignore community plugin storage if it's too noisy
-# .obsidian/plugins/*/data.json
+# --- MOBILE CONFIG ---
+.obsidian-mobile/workspace.json
+.obsidian-mobile/workspace-mobile.json
+.obsidian-mobile/cache/
+.obsidian-mobile/indexedDWB/
+.obsidian-mobile/plugins/

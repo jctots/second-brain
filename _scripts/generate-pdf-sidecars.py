@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # Generates MD sidecars for PDFs that don't already have one.
-# Text-layer PDFs use pdfplumber (fast); image PDFs use marker (OCR).
-import subprocess
-import tempfile
+# Text-layer PDFs use pdfplumber (fast); image PDFs use tesseract (CPU OCR).
 from pathlib import Path
 
 import pdfplumber
+import pypdfium2
+import pytesseract
 
 REPO_ROOT = Path(".")
 TEXT_THRESHOLD = 100  # chars per page to consider text-based
@@ -27,17 +27,14 @@ def extract_pdfplumber(pdf_path):
         return "\n\n".join(page.extract_text() or "" for page in pdf.pages)
 
 
-def extract_marker(pdf_path):
-    with tempfile.TemporaryDirectory() as tmpdir:
-        result = subprocess.run(
-            ["marker_single", str(pdf_path), "--output_dir", tmpdir],
-            capture_output=True, text=True
-        )
-        if result.returncode != 0:
-            print(f"  marker error: {result.stderr}")
-            return None
-        matches = list(Path(tmpdir).rglob(f"{pdf_path.stem}.md"))
-        return matches[0].read_text(encoding="utf-8") if matches else None
+def extract_tesseract(pdf_path):
+    doc = pypdfium2.PdfDocument(str(pdf_path))
+    pages = []
+    for page in doc:
+        bitmap = page.render(scale=2)
+        img = bitmap.to_pil()
+        pages.append(pytesseract.image_to_string(img))
+    return "\n\n".join(pages)
 
 
 def main():
@@ -57,8 +54,8 @@ def main():
             print("  text layer → pdfplumber")
             content = extract_pdfplumber(pdf)
         else:
-            print("  image PDF → marker")
-            content = extract_marker(pdf)
+            print("  image PDF → tesseract")
+            content = extract_tesseract(pdf)
 
         if content:
             dest = pdf.parent / f"{pdf.stem}.md"
