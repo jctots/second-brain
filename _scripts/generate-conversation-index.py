@@ -68,12 +68,12 @@ def main():
     lines = [
         "<!-- AUTO-GENERATED - do not edit manually. Run _scripts/generate-conversation-index.py to refresh. -->",
         "",
-        "# Conversations",
+        "# 💬 Conversations",
         "",
     ]
 
     for month in sorted(by_month.keys(), reverse=True):
-        lines.append(f"## {month}")
+        lines.append(f"## 📅 {month}")
         lines.append("")
         lines.append("| Date | Projects | Conversation |")
         lines.append("|------|----------|--------------|")

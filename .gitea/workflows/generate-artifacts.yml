@@ -27,7 +27,11 @@ jobs:
         run: python3 _scripts/generate-pending-events.py
 
       - name: Generate PDF sidecars
-        run: pip install pdfplumber marker-pdf && python3 _scripts/generate-pdf-sidecars.py
+        run: |
+          apt-get update && apt-get install -y tesseract-ocr
+          python3 -m venv /tmp/pdf-venv
+          /tmp/pdf-venv/bin/pip install pdfplumber pytesseract pypdfium2
+          /tmp/pdf-venv/bin/python3 _scripts/generate-pdf-sidecars.py
 
       - name: Commit artifacts
         run: |

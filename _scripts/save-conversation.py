@@ -26,12 +26,12 @@ PROCESSED_MARKERS = {
 def format_user_text(text):
     text = re.sub(
         r"(?s)<ide_opened_file>The user opened the file (.+?) in the IDE\.[^<]*</ide_opened_file>",
-        r"> `Opened in IDE` \1",
+        r"🖥️ `Opened in IDE` \1",
         text,
     )
     text = re.sub(
         r"(?s)<ide_selection>The user selected the lines (\d+) to (\d+) from (.+?):\n.*?</ide_selection>",
-        r"> `Selected in IDE` lines \1-\2 in \3",
+        r"🖥️ `Selected in IDE` lines \1-\2 in \3",
         text,
     )
     text = re.sub(r"(?s)<system-reminder>.*?</system-reminder>", "", text)
@@ -42,29 +42,29 @@ def format_tool_call(part):
     n = part.get("name", "")
     i = part.get("input", {})
     if n == "Read":
-        return f"> `Read` {i.get('file_path', '')}"
+        return f"🔧 `Read` {i.get('file_path', '')}"
     if n == "Write":
-        return f"> `Write` {i.get('file_path', '')}"
+        return f"🔧 `Write` {i.get('file_path', '')}"
     if n == "Edit":
-        return f"> `Edit` {i.get('file_path', '')}"
+        return f"🔧 `Edit` {i.get('file_path', '')}"
     if n in ("Bash", "PowerShell"):
         d = i.get("description") or i.get("command", "")
         if len(d) > 100:
             d = d[:100] + "..."
-        return f"> `{n}` {d}"
+        return f"🔧 `{n}` {d}"
     if n == "Grep":
         loc = f" in {i['path']}" if i.get("path") else ""
-        return f"> `Grep` {i.get('pattern', '')}{loc}"
+        return f"🔧 `Grep` {i.get('pattern', '')}{loc}"
     if n == "Glob":
-        return f"> `Glob` {i.get('pattern', '')}"
+        return f"🔧 `Glob` {i.get('pattern', '')}"
     if n == "Agent":
         d = i.get("description") or i.get("subagent_type", "")
-        return f"> `Agent` {d}"
+        return f"🔧 `Agent` {d}"
     if n == "WebFetch":
-        return f"> `WebFetch` {i.get('url', '')}"
+        return f"🔧 `WebFetch` {i.get('url', '')}"
     if n == "WebSearch":
-        return f"> `WebSearch` {i.get('query', '')}"
-    return f"> `{n}`"
+        return f"🔧 `WebSearch` {i.get('query', '')}"
+    return f"🔧 `{n}`"
 
 
 def extract_projects_from_transcript(msg_order, msg_data) -> list:
@@ -317,7 +317,7 @@ def main():
         parts.append("")
 
     for entry in output_entries:
-        label = "**User:**" if entry["role"] == "user" else "**Assistant:**"
+        label = "### 💬 User" if entry["role"] == "user" else "### 🤖 Assistant"
         parts.append(label)
         parts.append("")
         for seg in entry["segments"]:
