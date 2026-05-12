@@ -103,13 +103,15 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 
 ### /maintain
 
-**Purpose:** Periodic vault health audit — four options.
+**Purpose:** Vault operations — six options covering the full vault health cycle.
 
 **What it covers:**
-- **Generate artifacts** — run all scripts locally, same as CI: `generate-conversation-index.py`, `generate-project-indices.py` (injects `## quick status` into each project index), `generate-dashboard.py` (project status table + tag-grouped resource TOC), `generate-pending-events.py`
-- **Pending events** — surface and process missed events from past conversations via `_conversations/pending-events.md`
+- **Generate artifacts** — run all scripts locally, same as CI: `generate-conversation-index.py`, `generate-project-indices.py`, `generate-dashboard.py`, `generate-pending-events.py`
+- **Inbox processing** — route `_inbox/` items to the right PARA location; flag distill candidates
+- **Event processing** — surface and process missed events from past conversations via `_conversations/pending-events.md`
+- **Memory maintenance** — `_self/` consolidation and project `_memory.md` budget management
+- **Resource note maintenance** — deduplicate and cross-link notes in `resources/`
 - **Reports** — structural audit, PARA lifecycle, inbox aging, conversation frontmatter gaps
-- **Reviews** — memory file staleness, `_self/` consolidation, budget management
 
 ### /sync
 
