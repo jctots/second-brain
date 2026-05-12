@@ -30,6 +30,6 @@ Save context from the current conversation to persistent storage. Execute in ord
    - `🪪 [profile processed]` only if a `_self/` file was written
    - `📋 [task processed]` only if task-relevant content was captured
 
-7. **Run budget check** — run `python _tests/test_r6_hook_budget.py` via Bash. If any file is at WARN (≥80%) or FAIL (>100%), emit `⚠️ [budget warn]: <filename> at <pct>%` for each affected file. No output needed if all files are within limits.
+7. **Run budget check** — run `python _tests/test_hook_budget.py` via Bash. If any file is at WARN (≥80%) or FAIL (>100%), emit `⚠️ [budget warn]: <filename> at <pct>%` for each affected file. No output needed if all files are within limits.
 
 8. Briefly confirm what was written and what was skipped (one line per file).

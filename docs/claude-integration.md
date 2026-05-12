@@ -44,8 +44,8 @@ Each script has its own independent budget — splitting files into separate hoo
 
 The warn threshold (80%) is enforced in two places:
 
-- **CI** — [`_tests/test_r6_hook_budget.py`](../_tests/test_r6_hook_budget.py) runs on every push to `main` and fails the build if any file exceeds 10,000 chars.
-- **`/remember`** — step 7 of the `/remember` command runs `_tests/test_r6_hook_budget.py` after writing context files and emits `⚠️ [budget warn]` for any file at or above the warn threshold.
+- **CI** — [`_tests/test_hook_budget.py`](../_tests/test_hook_budget.py) runs on every push to `main` and fails the build if any file exceeds 10,000 chars.
+- **`/remember`** — step 7 of the `/remember` command runs `_tests/test_hook_budget.py` after writing context files and emits `⚠️ [budget warn]` for any file at or above the warn threshold.
 
 ### The extended section pattern
 

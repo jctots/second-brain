@@ -18,7 +18,7 @@ Run all scripts in order:
 - `python _scripts/generate-project-indices.py`
 - `python _scripts/generate-dashboard.py`
 - `python _scripts/generate-pending-events.py`
-- `python _tests/test_r6_hook_budget.py`
+- `python _tests/test_hook_budget.py`
 
 Report: what was regenerated and budget output summary.
 

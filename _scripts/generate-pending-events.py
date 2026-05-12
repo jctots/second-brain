@@ -51,7 +51,7 @@ def main():
     conv_dir = root / "_conversations"
     output_path = root / "_conversations" / "pending-events.md"
 
-    files = [f for f in conv_dir.rglob("*.md") if f.name != "index.md"]
+    files = [f for f in conv_dir.rglob("*.md") if f.name not in ("index.md", "pending-events.md")]
 
     pending_entries = []
     for f in files:
