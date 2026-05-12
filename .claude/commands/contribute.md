@@ -24,6 +24,10 @@ Filter out content paths — never contribute anything under:
 - `personal/`, `professional/`, `public/` — **except** the second-brain-setup SE docs listed below
 - `_self/`, `_daily/`, `_conversations/`, `_inbox/`
 
+Also block these framework-path files — they exist in both repos but serve different purposes and must never be a straight copy:
+- `.gitignore` — the upstream version includes content-blocking entries the private vault does not need; changes must be crafted manually per the upstream version, not copied from the vault
+- `dashboard.md` — generated file containing personal project links; the upstream version is a blank starter
+
 **Allowed exceptions under `personal/projects/second-brain-setup/`** (second-brain-setup SE docs, not private content):
 - `architecture.md`
 - `requirements.md`

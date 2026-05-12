@@ -10,7 +10,7 @@ Invoked as `/distill`
 
 2. **Process each event, one at a time:**
    a. **Check for existing notes** — grep `resources/` across all contexts for notes with overlapping titles or tags. If a close match exists, read it and decide: propose updating the existing note instead of creating a new one.
-   b. Draft the note content — structured, concise, suitable for `resources/`.
+   b. Draft the note content — structured, concise, suitable for `resources/`. Default path: `personal/resources/`; use `public/resources/` only if the user explicitly requests it.
    c. Show: proposed path (existing or new), draft content, and a one-line reason for placing it there.
    d. Engage interactively — the user may add context, redirect scope, change the path, or ask for revisions. Iterate until the user explicitly confirms or skips the item.
    e. On confirm: write the note (Edit if exists, Write if new).
@@ -36,7 +36,7 @@ Use when you want to mine an existing document for portable concepts worth keepi
 
 4. **For each candidate, one at a time:**
    a. **Check for existing notes** — grep `resources/` across all contexts for notes with overlapping titles or tags. If a close match exists, read it and decide: propose updating the existing note instead of creating a new one.
-   b. Propose a path in `resources/` (personal or public depending on sensitivity; existing path if updating).
+   b. Propose a path in `personal/resources/` by default; use `public/resources/` only if the user explicitly requests it. Existing path if updating.
    c. Draft a self-contained atomic note — structured, readable without the source file.
    d. Show: proposed path, draft content, one-line reason. If updating an existing note, show a diff-style summary of what would change.
    e. Engage interactively — user may revise, redirect, or skip. Iterate until confirmed or skipped.
@@ -46,7 +46,7 @@ Use when you want to mine an existing document for portable concepts worth keepi
       *Source: [[wikilink-to-source-file]]*
       ```
       Edit the source file: insert `*→ Distilled: [[path/to/note]]*` on the line immediately after the section heading.
-   f. On skip: move to the next candidate.
+   g. On skip: move to the next candidate.
 
 5. **Emit processed marker** — output `📦 [distill processed]` on its own line.
 

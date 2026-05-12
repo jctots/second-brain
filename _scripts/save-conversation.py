@@ -16,7 +16,7 @@ EVENT_MARKERS = {
 }
 
 PROCESSED_MARKERS = {
-    "🔁 [remember processed]": "remember",
+    "🔁 [remember processed]": "memory",
     "🪪 [profile processed]": "profile",
     "📦 [distill processed]": "distill",
     "📋 [task processed]": "task",
