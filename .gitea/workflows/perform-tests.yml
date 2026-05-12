@@ -1,0 +1,30 @@
+name: Run tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        run: |
+          git clone https://oauth2:${{ secrets.GITEA_TOKEN }}@git.3etn.net/${{ gitea.repository }}.git .
+
+      - name: T1 — Hook injection budget
+        run: python3 _tests/test_hook_budget.py
+
+      - name: T2 — Inject hooks
+        run: python3 _tests/test_inject_hooks.py
+
+      - name: T3 — Save conversation
+        run: python3 _tests/test_save_conversation.py
+
+      - name: T4 — Generate pending events
+        run: python3 _tests/test_generate_pending_events.py
+
+      - name: T5 — Generate dashboard
+        run: python3 _tests/test_generate_dashboard.py

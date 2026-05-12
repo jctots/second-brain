@@ -158,25 +158,33 @@ def generate_tag_pages(root):
         print(f"Generated {len(tag_map)} tag pages in {ctx}/resources/tags/")
 
 
+CTX_EMOJI = {"personal": "🏠", "professional": "💼", "public": "🌐"}
+PARA_EMOJI = {"projects": "📋", "areas": "🗂️", "resources": "📚"}
+PARA_LABEL = {"projects": "Projects", "areas": "Areas", "resources": "Resources"}
+
+
 def generate_toc(root):
     lines = []
     for ctx in ("personal", "professional", "public"):
-        lines.append(f"## {ctx}")
+        emoji = CTX_EMOJI[ctx]
+        lines.append(f"## {emoji} {ctx.capitalize()}")
         lines.append("")
         for para in ("projects", "areas", "resources"):
+            pe = PARA_EMOJI[para]
+            pl = PARA_LABEL[para]
             para_dir = root / ctx / para
             if not para_dir.exists():
-                lines.append(f"**{para}:** —")
+                lines.append(f"{pe} **{pl}:** —")
                 lines.append("")
                 continue
 
             if para == "projects":
                 entries = collect_projects(para_dir)
                 if not entries:
-                    lines.append("**projects:** —")
+                    lines.append(f"{pe} **{pl}:** —")
                     lines.append("")
                     continue
-                lines.append("**projects:**")
+                lines.append(f"{pe} **{pl}:**")
                 for wl, status in entries:
                     suffix = f" — {status}" if status else ""
                     lines.append(f"- {wl}{suffix}")
@@ -185,7 +193,7 @@ def generate_toc(root):
             elif para == "resources":
                 entries = collect_resources(para_dir)
                 if not entries:
-                    lines.append("**resources:** —")
+                    lines.append(f"{pe} **{pl}:** —")
                     lines.append("")
                     continue
                 tag_map = {}
@@ -200,12 +208,12 @@ def generate_toc(root):
                 tag_links = [f"[[{ctx}/resources/tags/{t}|#{t}]]" for t in sorted(tag_map)]
                 if untagged:
                     tag_links.extend(untagged)
-                lines.append(f"**resources:** {' · '.join(tag_links) if tag_links else '—'}")
+                lines.append(f"{pe} **{pl}:** {' · '.join(tag_links) if tag_links else '—'}")
                 lines.append("")
 
             else:  # areas
                 items = collect_flat(para_dir)
-                lines.append(f"**{para}:** {' · '.join(items) if items else '—'}")
+                lines.append(f"{pe} **{pl}:** {' · '.join(items) if items else '—'}")
                 lines.append("")
 
         lines.append("---")

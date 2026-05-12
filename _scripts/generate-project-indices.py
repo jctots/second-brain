@@ -34,10 +34,17 @@ def parse_quick_status(memory_path):
     return status, next_items
 
 
-def remove_section(lines, heading):
-    escaped = re.escape(heading)
+SECTIONS = {
+    "quick status": "⚡ Quick Status",
+    "files": "📁 Files",
+    "relevant conversations": "💬 Relevant Conversations",
+}
+
+
+def remove_section(lines, keyword):
+    # Matches heading by keyword, ignoring leading emoji or capitalization
     for i, line in enumerate(lines):
-        if re.match(rf"^## {escaped}\s*$", line, re.IGNORECASE):
+        if re.match(r"^## ", line) and re.search(re.escape(keyword), line, re.IGNORECASE):
             sec_end = len(lines)
             for j in range(i + 1, len(lines)):
                 if re.match(r"^## ", lines[j]):
@@ -111,7 +118,7 @@ def update_index(dir_path, index_path, wl_prefix, conv_entries, memory_path=None
     content = index_path.read_text(encoding="utf-8")
     lines = content.splitlines()
 
-    has_conv_section = bool(re.search(r"^## relevant conversations\s*$", content, re.MULTILINE | re.IGNORECASE))
+    has_conv_section = bool(re.search(r"^## .*relevant conversations\s*$", content, re.MULTILINE | re.IGNORECASE))
 
     # Compute quick status content before stripping
     qs_lines = None
@@ -125,12 +132,12 @@ def update_index(dir_path, index_path, wl_prefix, conv_entries, memory_path=None
                 qs_lines += ["**next:** —"]
 
     # Strip all managed sections, then re-append in enforced order
-    for heading in ("quick status", "files", "relevant conversations"):
-        lines = remove_section(lines, heading)
+    for keyword in SECTIONS:
+        lines = remove_section(lines, keyword)
 
     if qs_lines is not None:
-        lines = append_section(lines, "quick status", qs_lines)
-    lines = append_section(lines, "files", file_lines)
+        lines = append_section(lines, SECTIONS["quick status"], qs_lines)
+    lines = append_section(lines, SECTIONS["files"], file_lines)
 
     if conv_entries or has_conv_section:
         if conv_entries:
@@ -141,7 +148,7 @@ def update_index(dir_path, index_path, wl_prefix, conv_entries, memory_path=None
             ] + [f"| {e['date']} | [[{e['base']}]] |" for e in sorted_convs]
         else:
             conv_lines = ["_No classified conversations yet._"]
-        lines = append_section(lines, "relevant conversations", conv_lines)
+        lines = append_section(lines, SECTIONS["relevant conversations"], conv_lines)
 
     new_content = "\n".join(lines).rstrip() + "\n"
     index_path.write_text(new_content, encoding="utf-8")
