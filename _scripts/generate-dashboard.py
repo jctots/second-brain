@@ -3,6 +3,8 @@
 # Preserves everything above the first --- separator (manual header).
 # Run from repo root: python _scripts/generate-dashboard.py
 import re
+import shutil
+from datetime import date
 from pathlib import Path
 
 
@@ -61,6 +63,8 @@ def collect_resources(para_dir):
     """Return list of (wikilink, file_path) for all resource files."""
     results = []
     for item in sorted(para_dir.iterdir()):
+        if item.is_dir() and item.name == "tags":
+            continue
         if item.is_dir():
             if (item / "index.md").exists():
                 results.append((f"[[{item.name}/index|{item.name}]]", None))
@@ -99,6 +103,59 @@ def collect_projects(para_dir):
         status, _ = parse_quick_status(item / "_memory.md")
         results.append((wl, status))
     return results
+
+
+def generate_tag_pages(root):
+    """Write per-tag resource index pages under {ctx}/resources/tags/. Wipes stale pages."""
+    for ctx in ("personal", "professional", "public"):
+        resources_dir = root / ctx / "resources"
+        tags_dir = resources_dir / "tags"
+
+        if not resources_dir.exists():
+            continue
+
+        entries = collect_resources(resources_dir)
+        tag_map = {}
+        for wl, fp in entries:
+            tags = parse_frontmatter_tags(fp) if fp else []
+            for tag in tags:
+                tag_map.setdefault(tag, []).append(wl)
+
+        existing_created = {}
+        if tags_dir.exists():
+            for existing_page in tags_dir.glob("*.md"):
+                m = re.search(r"^created:\s*(\S+)", existing_page.read_text(encoding="utf-8"), re.MULTILINE)
+                if m:
+                    existing_created[existing_page.stem] = m.group(1)
+            shutil.rmtree(tags_dir)
+
+        if not tag_map:
+            continue
+
+        tags_dir.mkdir(parents=True)
+        today = date.today().isoformat()
+        for tag, wls in sorted(tag_map.items()):
+            page = tags_dir / f"{tag}.md"
+            created = existing_created.get(tag, today)
+            lines = [
+                "---",
+                f"context: {ctx}",
+                "para: resources",
+                f"tags: [{tag}]",
+                f"created: {created}",
+                "---",
+                "",
+                f"# #{tag}",
+                "",
+                "[[dashboard|⬅️ Dashboard]]",
+                "",
+            ]
+            for wl in sorted(wls):
+                lines.append(f"- {wl}")
+            lines.append("")
+            page.write_text("\n".join(lines), encoding="utf-8")
+
+        print(f"Generated {len(tag_map)} tag pages in {ctx}/resources/tags/")
 
 
 def generate_toc(root):
@@ -140,14 +197,10 @@ def generate_toc(root):
                             tag_map.setdefault(tag, []).append(wl)
                     else:
                         untagged.append(wl)
-                cluster_tags = {t: wls for t, wls in tag_map.items() if len(wls) >= 2}
-                clustered_wls = {wl for wls in cluster_tags.values() for wl in wls}
-                other = sorted(set(untagged) | {wl for wls in tag_map.values() for wl in wls if wl not in clustered_wls})
-                lines.append("**resources:**")
-                for tag in sorted(cluster_tags):
-                    lines.append(f"- `#{tag}` — {' · '.join(cluster_tags[tag])}")
-                if other:
-                    lines.append(f"- `#other` — {' · '.join(other)}")
+                tag_links = [f"[[{ctx}/resources/tags/{t}|#{t}]]" for t in sorted(tag_map)]
+                if untagged:
+                    tag_links.extend(untagged)
+                lines.append(f"**resources:** {' · '.join(tag_links) if tag_links else '—'}")
                 lines.append("")
 
             else:  # areas
@@ -177,6 +230,7 @@ def main():
     while manual_header and not manual_header[-1].strip():
         manual_header.pop()
 
+    generate_tag_pages(root)
     toc_lines = generate_toc(root)
 
     new_lines = (

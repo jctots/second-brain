@@ -216,7 +216,7 @@ User pushes to Gitea
 ```
 
 ### Event marker model
-*→ Distilled: [[public/resources/ai-conversation-event-markers]]*
+*→ Distilled: [[personal/resources/ai-conversation-event-markers]]*
 
 During a conversation, the AI emits inline markers when capture-worthy moments occur. Each marker includes a one-line description. `save-conversation.py` scans for these markers and writes two frontmatter fields:
 
@@ -372,7 +372,7 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 ---
 
 ### A1 — Memory capture model
-*→ Distilled: [[public/resources/ai-memory-capture-judgment-pass]]*
+*→ Distilled: [[personal/resources/ai-memory-capture-judgment-pass]]*
 
 #### Design principle
 
@@ -421,7 +421,7 @@ Two jobs:
 ---
 
 ### A2 — Gitea Actions workflows
-*→ Distilled: [[public/resources/ci-vs-local-hooks-design-principle]]*
+*→ Distilled: [[personal/resources/ci-vs-local-hooks-design-principle]]*
 
 **Design principle:** prefer CI for derived/generated artifacts; prefer local hooks only for things that must block a bad commit.
 
@@ -430,7 +430,7 @@ Two jobs:
 | Workflow | CI | Trigger | What it does |
 |---|---|---|---|
 | `generate-artifacts.yml` | Gitea Actions | Push to `main` | Runs `generate-conversation-index.py`, `generate-project-indices.py`, `generate-pending-events.py`; commits updated indexes and `pending-events.md` |
-| `test.yml` | Gitea Actions | Push to `main` | Runs `test_r6_hook_budget.py` |
+| `test.yml` | Gitea Actions | Push to `main` | Runs `test_hook_budget.py` |
 | Framework tests | GitHub Actions | Push to public fork | Runs `_tests/` against framework files only |
 
 ---
@@ -487,7 +487,7 @@ Location: `.claude/commands/`
 | `/init` | Initialize a new vault entry — asks goal, inputs, and context; proposes PARA category + slug; creates project folder (4 files) or single area/resource file; updates dashboard |
 | `/remember` | End of session — judgment pass over current conversation, appends captures to project `_memory.md` |
 | `/distill` | Periodic — process 🗂️ event markers from current conversation into `resources/` notes |
-| `/maintain` | Periodic vault audit — 4 options: generate artifacts, pending events, reports, reviews |
+| `/maintain` | Periodic vault operations — 6 options: generate artifacts, inbox processing, event processing, memory maintenance, resource note maintenance, reports |
 | `/sync` | Git operations — commit staged work, check or pull framework updates |
 | `/search` | Query vault by meaning (Tier 2/3 semantic via Qdrant) or keyword (Tier 1 ripgrep) |
 | `/contribute` | Contribute framework improvements to upstream GitHub |
@@ -497,7 +497,7 @@ Adding a new command: create `.claude/commands/{name}.md`. No registration requi
 ---
 
 ### Automation reliability summary
-*→ Distilled: [[public/resources/ai-agent-hook-vs-instruction-reliability]]*
+*→ Distilled: [[personal/resources/ai-agent-hook-vs-instruction-reliability]]*
 
 | Behavior | Mechanism | Reliability |
 |---|---|---|
@@ -523,7 +523,7 @@ How Claude Code connects to a local or private-cloud Ollama instance — the mec
 ---
 
 ### What it is
-*→ Distilled: [[public/resources/litellm-claude-code-local-model-proxy]]*
+*→ Distilled: [[personal/resources/litellm-claude-code-local-model-proxy]]*
 
 LiteLLM is a proxy that translates Claude Code's Anthropic Messages API format (`/v1/messages`) into the OpenAI-compatible format that Ollama exposes. Claude Code's harness — hooks, slash commands, conversation saving, context injection — continues to work unchanged. The only difference is where inference happens.
 
@@ -601,7 +601,7 @@ Test scripts in `_tests/` verify requirements automatically. They run in Gitea A
 
 | Test | Requirement | What it checks |
 |---|---|---|
-| `test_r6_hook_budget.py` | R6 | Each hook-injected file: warn at 8,000 chars (80%), fail at 10,000 chars (100%) — checked independently per file |
+| `test_hook_budget.py` | R6 | Each hook-injected file: warn at 8,000 chars (80%), fail at 10,000 chars (100%) — checked independently per file |
 
 Tests are deterministic pass/fail scripts — stdlib Python only (R2), no Claude session required. When a test fails, CI blocks. Add a new test whenever a requirement becomes mechanically checkable.
 
@@ -645,7 +645,7 @@ Plus: second-brain-setup SE docs (`personal/projects/second-brain-setup/` exclud
 `personal/` · `professional/` · `_self/` · `_daily/` · `_conversations/` · `_inbox/`
 
 ### Deployment tiers
-*→ Distilled: [[public/resources/three-tier-deployment-privacy-model]]*
+*→ Distilled: [[personal/resources/three-tier-deployment-privacy-model]]*
 
 The system supports three deployment tiers, all built from the same upstream framework.
 
@@ -707,7 +707,7 @@ git push upstream HEAD:improve/description
 ```
 
 ### Documentation structure
-*→ Distilled: [[public/resources/three-level-documentation-hierarchy]]*
+*→ Distilled: [[personal/resources/three-level-documentation-hierarchy]]*
 
 Three levels. Each serves a different reader.
 

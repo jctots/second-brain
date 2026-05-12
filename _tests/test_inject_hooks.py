@@ -1,0 +1,464 @@
+#!/usr/bin/env python3
+"""T2 — Tests for inject-profile.py, inject-rules.py, inject-context-claude.py, inject-context-memory.py"""
+import importlib.util
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+SCRIPTS = Path(__file__).parent.parent / "_scripts"
+REPO = Path(__file__).parent.parent
+
+
+def load_script(name):
+    path = SCRIPTS / name
+    spec = importlib.util.spec_from_file_location(
+        name.replace("-", "_").replace(".", "_"), path
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_profile = load_script("inject-profile.py")
+_context = load_script("inject-context-claude.py")
+
+
+def make_transcript(entries, path):
+    with open(path, "w", encoding="utf-8") as f:
+        for e in entries:
+            f.write(json.dumps(e) + "\n")
+
+
+def run_script(script_name, stdin_data):
+    result = subprocess.run(
+        [sys.executable, str(SCRIPTS / script_name)],
+        input=stdin_data,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    return result.returncode, result.stdout
+
+
+# --- T2.1-T2.6: is_first_turn ---
+
+class TestIsFirstTurn(unittest.TestCase):
+
+    def test_t2_1_no_transcript(self):
+        assert _profile.is_first_turn("/nonexistent/path/x.jsonl") is True
+
+    def test_t2_2_only_user_entries(self):
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d) / "t.jsonl"
+            make_transcript([{"type": "user"}], t)
+            assert _profile.is_first_turn(str(t)) is True
+
+    def test_t2_3_has_assistant_entry(self):
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d) / "t.jsonl"
+            make_transcript([{"type": "user"}, {"type": "assistant"}], t)
+            assert _profile.is_first_turn(str(t)) is False
+
+    def test_t2_4_empty_transcript(self):
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d) / "t.jsonl"
+            t.write_text("", encoding="utf-8")
+            assert _profile.is_first_turn(str(t)) is True
+
+    def test_t2_5_malformed_json_lines(self):
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d) / "t.jsonl"
+            t.write_text('not json\n{"type":"user"}\n', encoding="utf-8")
+            assert _profile.is_first_turn(str(t)) is True
+
+    def test_t2_6_blank_lines(self):
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d) / "t.jsonl"
+            t.write_text('\n\n{"type":"user"}\n\n', encoding="utf-8")
+            assert _profile.is_first_turn(str(t)) is True
+
+
+# --- T2.7-T2.14: inject-profile.py / inject-rules.py main() ---
+
+class TestInjectProfileMain(unittest.TestCase):
+
+    def _vault(self, d, about=None, rules=None):
+        vault = Path(d)
+        (vault / "_self").mkdir(exist_ok=True)
+        if about is not None:
+            (vault / "_self/about.md").write_text(about, encoding="utf-8")
+        if rules is not None:
+            (vault / "_self/rules.md").write_text(rules, encoding="utf-8")
+        return vault
+
+    def test_t2_7_profile_first_turn(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault = self._vault(d, about="# About\nSystems engineer.")
+            t = Path(d) / "t.jsonl"
+            make_transcript([{"type": "user"}], t)
+            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "hello"})
+            rc, out = run_script("inject-profile.py", hook)
+            assert rc == 0
+            assert "Systems engineer." in out
+
+    def test_t2_8_rules_first_turn(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault = self._vault(d, rules="# Rules\nBe terse.")
+            t = Path(d) / "t.jsonl"
+            make_transcript([{"type": "user"}], t)
+            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "hello"})
+            rc, out = run_script("inject-rules.py", hook)
+            assert rc == 0
+            assert "Be terse." in out
+
+    def test_t2_9_empty_stdin(self):
+        rc, out = run_script("inject-profile.py", "")
+        assert rc == 0
+        assert out == ""
+
+    def test_t2_10_invalid_json_stdin(self):
+        rc, out = run_script("inject-profile.py", "not json")
+        assert rc == 0
+        assert out == ""
+
+    def test_t2_11_no_transcript_path_injects_unconditionally(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault = self._vault(d, about="# About\nHello.")
+            hook = json.dumps({"cwd": str(vault), "prompt": "hello"})
+            rc, out = run_script("inject-profile.py", hook)
+            assert rc == 0
+            assert "Hello." in out
+
+    def test_t2_12_second_turn_no_output(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault = self._vault(d, about="# About\nHello.")
+            t = Path(d) / "t.jsonl"
+            make_transcript([{"type": "user"}, {"type": "assistant"}], t)
+            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "next"})
+            rc, out = run_script("inject-profile.py", hook)
+            assert rc == 0
+            assert out.strip() == ""
+
+    def test_t2_13_about_missing_no_crash(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault = self._vault(d)  # _self/ exists but no about.md
+            t = Path(d) / "t.jsonl"
+            make_transcript([{"type": "user"}], t)
+            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "hello"})
+            rc, out = run_script("inject-profile.py", hook)
+            assert rc == 0
+            assert out.strip() == ""
+
+    def test_t2_14_cwd_missing_defaults_dot(self):
+        hook = json.dumps({"transcript_path": "/nonexistent.jsonl", "prompt": "hello"})
+        rc, _ = run_script("inject-profile.py", hook)
+        assert rc == 0
+
+
+# --- T2.15-T2.19: get_first_user_message ---
+
+class TestGetFirstUserMessage(unittest.TestCase):
+
+    def test_t2_15_dict_message_text_block(self):
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d) / "t.jsonl"
+            make_transcript([{
+                "type": "user",
+                "message": {"role": "user", "content": [{"type": "text", "text": "hello world"}]},
+            }], t)
+            assert _context.get_first_user_message(str(t)) == "hello world"
+
+    def test_t2_16_string_message(self):
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d) / "t.jsonl"
+            make_transcript([{"type": "user", "message": "direct string"}], t)
+            assert _context.get_first_user_message(str(t)) == "direct string"
+
+    def test_t2_17_no_transcript(self):
+        assert _context.get_first_user_message("/nonexistent.jsonl") is None
+
+    def test_t2_18_no_user_entries(self):
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d) / "t.jsonl"
+            make_transcript([{"type": "assistant"}], t)
+            assert _context.get_first_user_message(str(t)) is None
+
+    def test_t2_19_malformed_lines_skipped(self):
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d) / "t.jsonl"
+            t.write_text('bad json\n{"type":"user","message":"hi"}\n', encoding="utf-8")
+            assert _context.get_first_user_message(str(t)) == "hi"
+
+
+# --- T2.20-T2.22: get_ide_opened_file ---
+
+class TestGetIdeOpenedFile(unittest.TestCase):
+
+    def test_t2_20_ide_annotation(self):
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d) / "t.jsonl"
+            text = "The user opened the file /path/to/file.md in the IDE."
+            make_transcript([{
+                "type": "user",
+                "message": {"role": "user", "content": [{"type": "text", "text": text}]},
+            }], t)
+            assert _context.get_ide_opened_file(str(t)) == "/path/to/file.md"
+
+    def test_t2_21_no_annotation(self):
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d) / "t.jsonl"
+            make_transcript([{
+                "type": "user",
+                "message": {"role": "user", "content": [{"type": "text", "text": "nothing here"}]},
+            }], t)
+            assert _context.get_ide_opened_file(str(t)) is None
+
+    def test_t2_22_unusual_absolute_path(self):
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d) / "t.jsonl"
+            fp = "/unusual/deep/nested/path/file.md"
+            text = f"The user opened the file {fp} in the IDE."
+            make_transcript([{
+                "type": "user",
+                "message": {"role": "user", "content": [{"type": "text", "text": text}]},
+            }], t)
+            assert _context.get_ide_opened_file(str(t)) == fp
+
+
+# --- T2.23-T2.28: find_project_from_file ---
+
+class TestFindProjectFromFile(unittest.TestCase):
+
+    def test_t2_23_valid_project_path(self):
+        with tempfile.TemporaryDirectory() as d:
+            cwd = Path(d)
+            proj = cwd / "personal" / "projects" / "my-project"
+            proj.mkdir(parents=True)
+            result = _context.find_project_from_file(cwd, str(proj / "file.md"))
+            assert result == [proj]
+
+    def test_t2_24_path_not_relative_to_cwd(self):
+        with tempfile.TemporaryDirectory() as d1:
+            with tempfile.TemporaryDirectory() as d2:
+                cwd = Path(d1)
+                file_path = str(Path(d2) / "personal/projects/my-project/file.md")
+                result = _context.find_project_from_file(cwd, file_path)
+                assert result == []
+
+    def test_t2_25_path_too_few_parts(self):
+        with tempfile.TemporaryDirectory() as d:
+            cwd = Path(d)
+            result = _context.find_project_from_file(cwd, str(cwd / "file.md"))
+            assert result == []
+
+    def test_t2_26_invalid_context(self):
+        with tempfile.TemporaryDirectory() as d:
+            cwd = Path(d)
+            result = _context.find_project_from_file(cwd, str(cwd / "other/projects/x/file.md"))
+            assert result == []
+
+    def test_t2_27_not_projects_dir(self):
+        with tempfile.TemporaryDirectory() as d:
+            cwd = Path(d)
+            result = _context.find_project_from_file(cwd, str(cwd / "personal/areas/x/file.md"))
+            assert result == []
+
+    def test_t2_28_project_dir_does_not_exist(self):
+        with tempfile.TemporaryDirectory() as d:
+            cwd = Path(d)
+            (cwd / "personal" / "projects").mkdir(parents=True)
+            result = _context.find_project_from_file(cwd, str(cwd / "personal/projects/ghost/file.md"))
+            assert result == []
+
+
+# --- T2.29-T2.33: find_projects_in_message ---
+
+class TestFindProjectsInMessage(unittest.TestCase):
+
+    def _setup(self, d, name):
+        cwd = Path(d)
+        proj = cwd / "personal" / "projects" / name
+        proj.mkdir(parents=True)
+        return cwd, proj
+
+    def test_t2_29_hyphen_form(self):
+        with tempfile.TemporaryDirectory() as d:
+            cwd, proj = self._setup(d, "my-project")
+            result = _context.find_projects_in_message(cwd, "working on my-project today")
+            assert proj in result
+
+    def test_t2_30_space_form(self):
+        with tempfile.TemporaryDirectory() as d:
+            cwd, proj = self._setup(d, "my-project")
+            result = _context.find_projects_in_message(cwd, "working on my project today")
+            assert proj in result
+
+    def test_t2_31_substring_match(self):
+        with tempfile.TemporaryDirectory() as d:
+            cwd, proj = self._setup(d, "my-project")
+            result = _context.find_projects_in_message(cwd, "my-project-and-more")
+            assert proj in result
+
+    def test_t2_32_no_projects_dir_no_crash(self):
+        with tempfile.TemporaryDirectory() as d:
+            cwd = Path(d)
+            result = _context.find_projects_in_message(cwd, "my-project")
+            assert result == []
+
+    def test_t2_33_no_match(self):
+        with tempfile.TemporaryDirectory() as d:
+            cwd, _ = self._setup(d, "my-project")
+            result = _context.find_projects_in_message(cwd, "nothing relevant here")
+            assert result == []
+
+
+# --- T2.34-T2.41: inject-context-claude.py / inject-context-memory.py main() ---
+
+class TestInjectContextMain(unittest.TestCase):
+
+    def _vault(self, d, name, claude=None, memory=None):
+        vault = Path(d)
+        proj = vault / "personal" / "projects" / name
+        proj.mkdir(parents=True)
+        if claude is not None:
+            (proj / "CLAUDE.md").write_text(claude, encoding="utf-8")
+        if memory is not None:
+            (proj / "_memory.md").write_text(memory, encoding="utf-8")
+        return vault, proj
+
+    def _t(self, d, text, second_turn=False):
+        t = Path(d) / "t.jsonl"
+        entries = [{"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": text}]}}]
+        if second_turn:
+            entries.append({"type": "assistant", "message": {"role": "assistant"}})
+        make_transcript(entries, t)
+        return t
+
+    def test_t2_34_claude_md_injected(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault, _ = self._vault(d, "my-project", claude="# CLAUDE\nProject rules.")
+            t = self._t(d, "my-project work")
+            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "my-project work"})
+            rc, out = run_script("inject-context-claude.py", hook)
+            assert rc == 0
+            assert "Project rules." in out
+
+    def test_t2_35_memory_md_injected(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault, _ = self._vault(d, "my-project", memory="# Memory\nCurrent state.")
+            t = self._t(d, "my-project work")
+            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "my-project work"})
+            rc, out = run_script("inject-context-memory.py", hook)
+            assert rc == 0
+            assert "Current state." in out
+
+    def test_t2_36_multiple_projects_separated(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault = Path(d)
+            for name, content in [("proj-a", "# Alpha"), ("proj-b", "# Beta")]:
+                p = vault / "personal" / "projects" / name
+                p.mkdir(parents=True)
+                (p / "CLAUDE.md").write_text(content, encoding="utf-8")
+            t = self._t(d, "proj-a and proj-b")
+            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "proj-a and proj-b"})
+            rc, out = run_script("inject-context-claude.py", hook)
+            assert rc == 0
+            assert "# Alpha" in out
+            assert "# Beta" in out
+            assert "---" in out
+
+    def test_t2_37_ide_fallback(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault, _ = self._vault(d, "my-project", claude="# Fallback project.")
+            ide_path = str(vault / "personal/projects/my-project/notes.md")
+            text = f"The user opened the file {ide_path} in the IDE. no project name in message"
+            t = Path(d) / "t.jsonl"
+            make_transcript([{
+                "type": "user",
+                "message": {"role": "user", "content": [{"type": "text", "text": text}]},
+            }], t)
+            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": ""})
+            rc, out = run_script("inject-context-claude.py", hook)
+            assert rc == 0
+            assert "Fallback project." in out
+
+    def test_t2_38_missing_claude_md_no_crash(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault, _ = self._vault(d, "my-project")  # no CLAUDE.md
+            t = self._t(d, "my-project work")
+            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "my-project work"})
+            rc, out = run_script("inject-context-claude.py", hook)
+            assert rc == 0
+            assert out.strip() == ""
+
+    def test_t2_39_ide_fallback_not_in_project(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault = Path(d)
+            (vault / "personal" / "projects").mkdir(parents=True)
+            ide_path = str(vault / "some/other/file.md")
+            text = f"The user opened the file {ide_path} in the IDE."
+            t = Path(d) / "t.jsonl"
+            make_transcript([{
+                "type": "user",
+                "message": {"role": "user", "content": [{"type": "text", "text": text}]},
+            }], t)
+            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": ""})
+            rc, out = run_script("inject-context-claude.py", hook)
+            assert rc == 0
+            assert out.strip() == ""
+
+    def test_t2_40_message_and_ide_same_project_once(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault, _ = self._vault(d, "my-project", claude="# MyProject")
+            ide_path = str(vault / "personal/projects/my-project/file.md")
+            text = f"project: my-project\nThe user opened the file {ide_path} in the IDE."
+            t = Path(d) / "t.jsonl"
+            make_transcript([{
+                "type": "user",
+                "message": {"role": "user", "content": [{"type": "text", "text": text}]},
+            }], t)
+            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "my-project"})
+            rc, out = run_script("inject-context-claude.py", hook)
+            assert rc == 0
+            assert out.count("# MyProject") == 1
+
+    def test_t2_41_second_turn_no_output(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault, _ = self._vault(d, "my-project", claude="# CLAUDE")
+            t = self._t(d, "my-project work", second_turn=True)
+            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "my-project work"})
+            rc, out = run_script("inject-context-claude.py", hook)
+            assert rc == 0
+            assert out.strip() == ""
+
+
+# --- Smoke tests ---
+
+class TestSmoke(unittest.TestCase):
+
+    def test_smoke_inject_profile(self):
+        hook = json.dumps({"cwd": str(REPO), "prompt": "hello"})
+        rc, _ = run_script("inject-profile.py", hook)
+        assert rc == 0
+
+    def test_smoke_inject_rules(self):
+        hook = json.dumps({"cwd": str(REPO), "prompt": "hello"})
+        rc, _ = run_script("inject-rules.py", hook)
+        assert rc == 0
+
+    def test_smoke_inject_context_claude(self):
+        hook = json.dumps({"cwd": str(REPO), "prompt": "second-brain-setup"})
+        rc, _ = run_script("inject-context-claude.py", hook)
+        assert rc == 0
+
+    def test_smoke_inject_context_memory(self):
+        hook = json.dumps({"cwd": str(REPO), "prompt": "second-brain-setup"})
+        rc, _ = run_script("inject-context-memory.py", hook)
+        assert rc == 0
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
