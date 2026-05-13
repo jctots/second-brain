@@ -58,6 +58,7 @@ All scripts, hooks, and setup steps must work on Windows (primary) and Linux/mac
 - Scripts in Python, stdlib only, no OS-specific calls
 - No PowerShell-only or bash-only scripts in `_scripts/` — platform-specific setup helpers (`.ps1`, `.sh`) are allowed for setup only
 - Use `pathlib` for all path handling; never hardcode separators
+- Scripts in `_scripts/` that require external packages must be CI-only and isolated in a CI venv; they must not be called by hooks or invoked without that venv. Hook scripts must remain stdlib-only.
 
 ---
 

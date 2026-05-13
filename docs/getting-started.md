@@ -171,7 +171,7 @@ your-repo/
 
 ## 💡 Tips
 
-**Keep project instruction files under ~7,600 characters each.** Context has a hard budget per hook — large files are silently truncated. Use the `<!-- extended -->` marker in `_memory.md` to keep injected content bounded. See [claude-integration.md](claude-integration.md) for details.
+**Keep project instruction files under ~8,000 characters each.** Context has a hard budget per hook (10,000 chars) — large files are silently truncated. See [claude-integration.md](claude-integration.md) for details.
 
 **Name your project folders with kebab-case.** Easier to detect from natural language in your first message.
 

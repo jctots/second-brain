@@ -175,11 +175,16 @@ Python scripts callable both from Claude Code hooks and Gitea Actions CI. No ext
 | `inject-rules.py` | Hook (`UserPromptSubmit`) | Inject `_self/rules.md` summary |
 | `inject-context-claude.py` | Hook (`UserPromptSubmit`) | Detect project, inject project `CLAUDE.md` |
 | `inject-context-memory.py` | Hook (`UserPromptSubmit`) | Detect project, inject project `_memory.md` |
+| `inject-context-project.py` | Hook (`UserPromptSubmit`) | Detect project via Qdrant embedding (Tier 2/3) or keyword match (Tier 1 fallback); inject project `CLAUDE.md` + `_memory.md` — replaces `inject-context-claude.py` + `inject-context-memory.py` on Tier 2/3 |
+| `inject-context-rag.py` | Hook (`UserPromptSubmit`) | Inject relevant note titles (Qdrant top-3 above threshold); fulfill `📖 [retrieve: path]` markers from previous turn by injecting full file content |
 | `save-conversation.py` | Hook (`Stop`, `SessionEnd`) | Save session transcript to `_conversations/`; scan for event markers; write `events`/`processed` frontmatter |
 | `generate-conversation-index.py` | CI (`generate-artifacts.yml`), `/maintain` | Regenerate `_conversations/index.md` |
 | `generate-project-indices.py` | CI (`generate-artifacts.yml`), `/maintain` | Regenerate `## files`, `## relevant conversations`, and `## quick status` in each project `index.md` |
 | `generate-dashboard.py` | CI (`generate-artifacts.yml`), `/maintain` | Regenerate `dashboard.md` — `## active projects` table (quick status) + context TOC (resources grouped by cluster tags) |
 | `generate-pending-events.py` | CI (`generate-artifacts.yml`), `/maintain` | Scan conversations for unprocessed events; write `_conversations/pending-events.md` |
+| `generate-pdf-sidecars.py` | CI (`generate-artifacts.yml`) | Generate Markdown sidecars for PDFs — text-layer via pdfplumber; image PDFs via tesseract OCR (external deps: pdfplumber, pypdfium2, pytesseract; installed via CI venv) |
+| `embed-vault.py` | CI (`embed-vault.yml`), manual | Walk vault, chunk by heading (H2/H3), embed via Ollama (`embeddinggemma:latest`), upsert into Qdrant with metadata (path, para, context, project, tags) |
+| `search-vault.py` | `/search` slash command | Embed query string, query Qdrant, return top-5 ranked results (score · path · heading · snippet) |
 | `commit.py` | `/sync` (commit option) | Stage → commit → pull rebase → push |
 
 ---
@@ -204,7 +209,7 @@ User opens VSCode → types first message
 Claude finishes responding → Stop hook fires
   → save-conversation.py
       → writes _conversations/YYYY/MM/YYYY-MM-DD-{title}.md
-      → scans assistant text for event markers (🧠 🗂️ ✅ 🔁 📦 📋)
+      → scans assistant text for event markers (🧠 👤 🗂️ ✅) and processed markers (🔁 🪪 📦 📋)
       → writes events: [...] and processed: [...] to frontmatter
 User pushes to Gitea
   → Gitea Actions triggers generate-artifacts.yml
@@ -228,14 +233,17 @@ During a conversation, the AI emits inline markers when capture-worthy moments o
 | Marker | Event type | Trigger |
 |---|---|---|
 | `🧠 [memory event]` | `memory` | Project state change, key decision, profile fact, behavioral observation |
+| `👤 [profile event]` | `profile` | Profile fact or behavioral correction |
 | `🗂️ [distill event]` | `distill` | Lasting reference value: technology analysis, tool comparisons, design patterns |
 | `✅ [task event]` | `task` | Concrete next action for the user |
+| `📖 [retrieve: path]` | — | Full content load request; processed by `inject-context-rag.py` hook on next turn |
 
 **Processed markers (emitted by slash commands):**
 
 | Marker | Processed type | Emitted by |
 |---|---|---|
 | `🔁 [remember processed]` | `remember` | `/remember` |
+| `🪪 [profile processed]` | `profile` | `/remember` (when profile events found) |
 | `📦 [distill processed]` | `distill` | `/distill` |
 | `📋 [task processed]` | `task` | `/remember` (when task events found) |
 
@@ -371,6 +379,31 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 
 ---
 
+#### RAG title injection + content retrieval (`UserPromptSubmit`) — Tier 2/3
+
+**File:** `_scripts/inject-context-rag.py`
+**Fires on:** Every `UserPromptSubmit` (every turn)
+**What it does:**
+1. Embeds the user's message via Ollama (`embeddinggemma:latest`); queries Qdrant for top-3 results above similarity threshold; injects relevant note titles + file paths.
+2. Scans the previous Claude response for `📖 [retrieve: path]` markers; reads each file and injects full content.
+
+**Degrades gracefully:** outputs nothing if Qdrant or Ollama is unreachable.
+**Budget:** total output ≤ 8,000 chars (warn threshold).
+**Tier:** Tier 2/3 only — requires Qdrant and Ollama.
+
+---
+
+#### Project context injection via RAG (`UserPromptSubmit`) — Tier 2/3
+
+**File:** `_scripts/inject-context-project.py`
+**Fires on:** Every `UserPromptSubmit`, self-limits to first turn only
+**What it does:** Embeds the user's first message via Ollama; queries Qdrant against project-indexed embeddings to identify the relevant project; injects its `CLAUDE.md` + `_memory.md`. Falls back to keyword match on project folder names when Qdrant is unavailable.
+**Replaces:** `inject-context-claude.py` + `inject-context-memory.py` on Tier 2/3 (those scripts remain active for Tier 1).
+**Budget:** ≤ 10,000 chars (warn at 8,000; consolidation target 5,000).
+**Tier:** Tier 2/3 only.
+
+---
+
 ### A1 — Memory capture model
 *→ Distilled: [[personal/resources/ai-memory-capture-judgment-pass]]*
 
@@ -388,6 +421,7 @@ Claude emits visual markers mid-conversation when it notices something worth cap
 | ✅ `[task event]` | Concrete next action | Visual only — absorbed into 🧠 if worth persisting |
 | 👤 `[profile event]` | Profile fact or behavioral correction | `/remember` inline (facts → `_self/about.md`, corrections → `_self/rules.md`) or `/maintain` backstop |
 | 🗂️ `[distill event]` | Lasting reference value beyond this project | `/distill` |
+| 📖 `[retrieve: path]` | Full content load request for a vault note | `inject-context-rag.py` hook — fulfills on the next turn by injecting the file content |
 
 #### `/remember` — judgment pass
 
@@ -429,8 +463,9 @@ Two jobs:
 
 | Workflow | CI | Trigger | What it does |
 |---|---|---|---|
-| `generate-artifacts.yml` | Gitea Actions | Push to `main` | Runs `generate-conversation-index.py`, `generate-project-indices.py`, `generate-pending-events.py`; commits updated indexes and `pending-events.md` |
-| `test.yml` | Gitea Actions | Push to `main` | Runs `test_hook_budget.py` |
+| `generate-artifacts.yml` | Gitea Actions | Push to `main` | Runs generate scripts (conversation index, project indices, dashboard, pending events, PDF sidecars); commits updated artifacts |
+| `perform-tests.yml` | Gitea Actions | Push to `main`, PR | Runs T1–T5 (all test files in `_tests/`) |
+| `embed-vault.yml` | Gitea Actions | Push to `main` (when `.md` files change) | Incrementally re-embeds changed vault files into Qdrant (Tier 2/3 only) |
 | Framework tests | GitHub Actions | Push to public fork | Runs `_tests/` against framework files only |
 
 ---
@@ -487,9 +522,9 @@ Location: `.claude/commands/`
 | `/init` | Initialize a new vault entry — asks goal, inputs, and context; proposes PARA category + slug; creates project folder (4 files) or single area/resource file; updates dashboard |
 | `/remember` | End of session — judgment pass over current conversation, appends captures to project `_memory.md` |
 | `/distill` | Periodic — process 🗂️ event markers from current conversation into `resources/` notes |
-| `/maintain` | Periodic vault operations — 6 options: generate artifacts, inbox processing, event processing, memory maintenance, resource note maintenance, reports |
+| `/maintain` | Periodic vault operations — 7 options: generate artifacts, inbox processing, event processing, memory maintenance, resource note maintenance, documentation maintenance, reports |
 | `/sync` | Git operations — commit staged work, check or pull framework updates |
-| `/search` | Query vault by meaning (Tier 2/3 semantic via Qdrant) or keyword (Tier 1 ripgrep) |
+| `/search` | Query vault — Tier 1: keyword search (ripgrep); Tier 2/3: semantic search via Qdrant (`search-vault.py`) using `embeddinggemma:latest` |
 | `/contribute` | Contribute framework improvements to upstream GitHub |
 
 Adding a new command: create `.claude/commands/{name}.md`. No registration required. Avoid names that conflict with built-in Claude Code skills — built-ins take precedence on name collision.
@@ -513,6 +548,8 @@ Adding a new command: create `.claude/commands/{name}.md`. No registration requi
 | `/remember` trigger | User-invoked slash command | Reliable — user-triggered; session-scoped |
 | `/distill` trigger | User-invoked slash command | Reliable — user-triggered; cross-session |
 | `/maintain` trigger | User-invoked slash command | Reliable — user-triggered; periodic |
+| RAG title injection + content retrieval (Tier 2/3) | Hook (`inject-context-rag.py`, `UserPromptSubmit`) | Guaranteed if Qdrant + Ollama reachable; silent skip if unreachable |
+| Project context injection via RAG (Tier 2/3) | Hook (`inject-context-project.py`, `UserPromptSubmit`) | Guaranteed first turn if Qdrant + Ollama reachable; keyword fallback to Tier 1 |
 
 ---
 
@@ -597,11 +634,15 @@ Use the local model path for sensitive-content queries and simple tasks. Complex
 
 ## Verification
 
-Test scripts in `_tests/` verify requirements automatically. They run in Gitea Actions on every push to `main` (`.gitea/workflows/test.yml`). Each script is named after the requirement it covers.
+Test scripts in `_tests/` verify requirements automatically. They run in Gitea Actions on every push to `main` (`.gitea/workflows/perform-tests.yml`). Each script is named after the requirement it covers.
 
 | Test | Requirement | What it checks |
 |---|---|---|
 | `test_hook_budget.py` | R6 | Each hook-injected file: warn at 8,000 chars (80%), fail at 10,000 chars (100%) — checked independently per file |
+| `test_inject_hooks.py` | R11 | Inject hook scripts — turn-detection, project matching, file injection, resilience |
+| `test_save_conversation.py` | R10, R11 | Event marker extraction, conversation file writing, frontmatter |
+| `test_generate_pending_events.py` | R7, R10, R11 | Pending events generation — frontmatter parsing, output format, resilience |
+| `test_generate_dashboard.py` | R7, R11 | Dashboard generation — resource collection, quick status parsing, tag pages |
 
 Tests are deterministic pass/fail scripts — stdlib Python only (R2), no Claude session required. When a test fails, CI blocks. Add a new test whenever a requirement becomes mechanically checkable.
 

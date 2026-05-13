@@ -1,4 +1,4 @@
-# Test Plan — Scripts and Hooks
+# Verification — Scripts and Hooks
 
 Scenarios are identified as **T#.#** — first number is the test file, second is the case within it. IDs are unique across this document.
 

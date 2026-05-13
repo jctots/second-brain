@@ -16,18 +16,18 @@ This is a personal project — there are no release dates or commitments. Items 
 | **🔗 AI tool dependency** — slash commands live in `.claude/commands/` | Switching AI tools requires rewriting prompt files | The instruction files (`CLAUDE.md`, `_memory.md`, `_self/`) are plain Markdown — they work with any tool that reads files. Only the invocation layer is tool-specific. |
 | **🔍 Single-tool dependency for graph/search** — graph view and backlinks depend on Foam or Obsidian | Losing the tool removes those navigation features | Notes are plain Markdown with no proprietary syntax. Any compatible tool (Logseq, Notion import, etc.) works without data loss. |
 | **☁️ Tier 1: data sent to Anthropic** — at Tier 1, context is sent to Anthropic's API | Project context leaves your machine during sessions | Use Tier 2 or Tier 3 for sensitive content — set `ANTHROPIC_BASE_URL` to route inference through LiteLLM + Ollama instead. The line is yours to draw per session. See [PRIVACY.md](../PRIVACY.md). |
-| **🔍 Tier 1: keyword search only** — semantic search (RAG) requires Qdrant, which is only available at Tier 2/3 | Notes are retrieved by keyword match, not meaning — connections between notes are invisible unless you already know they exist | Upgrade to Tier 2 or Tier 3 to enable Qdrant + embedding-based semantic search and passive context surfacing. |
+| **🔍 Tier 1: keyword search only** — semantic search (RAG) requires Qdrant, which is only available at Tier 2/3 | Notes are retrieved by keyword match, not meaning — connections between notes are invisible unless you already know they exist | Tier 2/3: Qdrant + `embeddinggemma:latest` via Ollama; active search via `/search`, passive surfacing via `inject-context-rag.py` hook each turn. |
 
 
 ## 🎯 Near-term
 
-- [ ] **GitHub Actions workflow** — equivalent of a CI pipeline: auto-generates `_conversations/index.md` and project indexes on push
+- [x] **Gitea Actions workflow** — CI pipeline: auto-generates `_conversations/index.md`, project indexes, dashboard, and PDF sidecars on push
 - [ ] **Automated sanitization** — replace manual flag-and-review with a regex pass that substitutes known patterns automatically, reducing friction on each sync to upstream
 
 
 ## 🔭 Medium-term
 
-- [ ] **Semantic search across vault** — query notes by meaning, not just keyword. *Addresses: Tier 1 keyword-search-only limitation.* Implemented via Qdrant + Ollama embeddings at Tier 2/3. Goal: surface connections you didn't know existed.
+- [x] **Semantic search across vault** — query notes by meaning, not just keyword. Implemented via Qdrant + Ollama (`embeddinggemma:latest`) at Tier 2/3. Active search via `/search`; passive surfacing via `inject-context-rag.py` hook.
 - [ ] **Mobile capture workflow** — a lightweight path for quick inbox drops from mobile without VS Code. *Addresses: mobile AI-assistance limitation.* Likely Obsidian mobile + obsidian-git, or a minimal web form writing to the vault via the git API.
 - [ ] **Maps of Content (MOC) generation** — a command that generates or updates a hub note for a topic, linking all related notes grouped semantically.
 

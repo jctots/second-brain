@@ -67,6 +67,10 @@ _conversations/**
 _inbox/**
 !_inbox/.gitkeep
 
+# --- PYTHON ---
+__pycache__/
+*.pyc
+
 # --- DESKTOP CONFIG ---
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
