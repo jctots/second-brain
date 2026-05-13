@@ -17,7 +17,10 @@ There's also a privacy ceiling: persistent AI memory requires your data on their
 
 This system treats your projects as the primary artifact — decisions, notes, and reasoning accumulate as a byproduct of doing the work, not as a separate chore. Plain Markdown in version control as the durable layer, with an AI coding assistant as the intelligence layer. Four behaviors make this real:
 
-Four behaviors work together: **automatic context** loads your profile and project state at session start; **AI-proposed memory** flags decisions worth keeping — you confirm, and they persist as versioned Markdown files; **AI-proposed capture** surfaces reference knowledge worth keeping beyond the current project; and **retrieval** brings relevant notes back when they're needed.
+- **Personal and project context** — your profile, past feedback, and current project state load before you type the first message
+- **Memory proposals** — decisions worth keeping get flagged; you confirm, and they persist as versioned files
+- **Capture proposals** — knowledge worth keeping beyond this project gets surfaced and stored
+- **Note retrieval** — relevant notes come back when you need them
 
 See [docs/claude-integration.md](docs/claude-integration.md) for the full detail on each behavior.
 
@@ -41,7 +44,7 @@ For technical detail on context injection and automation boundaries, see [docs/c
 | Automatic memory               | ✓ (no action needed)       | —                   | —              | —                |
 | Memory — user-owned, versioned | —                          | —                   | ✓              | ✓                |
 | Active capture                 | —                          | —                   | ✓ `/distill`   | ✓ `/distill`     |
-| Active retrieval               | —                          | —                   | ✓ RAG          | ✓ RAG            |
+| Active retrieval               | —                          | —                   | ✓ keyword      | ✓ RAG            |
 | Local files / ownership        | —                          | ✓                   | ✓              | ✓                |
 | Version control                | —                          | plugin needed       | ✓              | ✓                |
 | Output files versioned         | —                          | —                   | ✓              | ✓                |

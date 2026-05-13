@@ -26,6 +26,12 @@ jobs:
       - name: Generate pending events
         run: python3 _scripts/generate-pending-events.py
 
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: pip-pdf-pdfplumber-pytesseract
+
       - name: Generate PDF sidecars
         run: |
           apt-get update && apt-get install -y tesseract-ocr
@@ -36,6 +42,6 @@ jobs:
       - name: Commit artifacts
         run: |
           git add _conversations/index.md _conversations/pending-events.md personal/ professional/ public/ dashboard.md
-          git ls-files --others --exclude-standard | grep '\.md$' | xargs -r git add
+          git ls-files --others --exclude-standard | grep '\.md$' | xargs -r git add || true
           git diff --cached --quiet || git commit -m "chore: regenerate indexes, pending events, and PDF sidecars"
           git push

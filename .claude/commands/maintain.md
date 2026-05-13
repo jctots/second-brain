@@ -7,7 +7,8 @@ Ask the user which operation:
 **(3) Event processing** — surface and process missed events from past conversations
 **(4) Memory maintenance** — consolidate and budget AI-maintained files
 **(5) Resource note maintenance** — deduplicate and cross-link resource notes
-**(6) Reports** — automated scans, findings only, no edits
+**(6) Documentation maintenance** — consistency check across implementation, SE docs, and README
+**(7) Reports** — automated scans, findings only, no edits
 
 ---
 
@@ -93,7 +94,77 @@ Read all notes in `resources/` across `personal/`, `professional/`, and `public/
 
 ---
 
-## Option 6 — Reports
+## Option 6 — Documentation maintenance
+
+Consistency check in three cascading layers. Each layer only runs if the previous layer produced changes.
+
+**Pattern per layer:**
+- Surface each inconsistency one at a time
+- For each: ask the user whether the implementation or the documentation is correct, or whether it is a planned change not yet implemented
+- Record the user's answer — do not apply any changes yet
+- After all inconsistencies in the layer are resolved: show all proposed changes together and wait for confirmation before writing
+
+---
+
+### Layer 1 — Implementation vs. SE docs
+
+Compare the actual implemented system against `requirements.md`, `architecture.md`, and `verification.md` (the SE document set for `second-brain-setup`).
+
+**What to read:**
+- `personal/projects/second-brain-setup/requirements.md`
+- `personal/projects/second-brain-setup/architecture.md`
+- `personal/projects/second-brain-setup/verification.md`
+- All scripts in `_scripts/`
+- All tests in `_tests/`
+- Hooks configured in `.claude/settings.json` or `.claude/settings.local.json`
+- Slash commands in `.claude/commands/`
+
+**What to check:**
+- Does each requirement (R#) have a corresponding implementation?
+- Does each architecture component (A#) match what the scripts and hooks actually do?
+- Does each test scenario (T#.#) match the current script behavior?
+- Are there implemented behaviors with no corresponding requirement, architecture component, or test?
+
+**Per inconsistency, ask:**
+> "Inconsistency: [description]. Is the [implementation / documentation] correct, or is this a planned change not yet implemented?"
+
+Wait for the user's answer before moving to the next inconsistency.
+
+After all inconsistencies: present a consolidated list of proposed changes (implementation edits or doc edits) and wait for user confirmation before writing.
+
+If no inconsistencies found, report and skip layers 2 and 3.
+
+---
+
+### Layer 2 — SE docs vs. docs/ and root .md files
+
+Run only if layer 1 produced changes. Compare the agreed state from layer 1 against:
+- All files in `docs/` (if the folder exists)
+- All `.md` files in the repo root **except** `README.md` and `dashboard.md`
+
+**What to check:**
+- Do these files reference requirements, components, or behaviors that were updated in layer 1?
+- Are there descriptions, diagrams, or references that now contradict the agreed state?
+
+Same pattern: surface each inconsistency, ask implementation vs. documentation, record answer, propose all changes together after all inconsistencies are resolved.
+
+If no inconsistencies found, report and skip layer 3.
+
+---
+
+### Layer 3 — Root README
+
+Run only if layer 2 produced changes. Compare the agreed state from layers 1–2 against `README.md`.
+
+**What to check:**
+- Does `README.md` describe features, components, or behaviors that were updated in layers 1–2?
+- Are there sections that now contradict the agreed state?
+
+Same pattern: surface each inconsistency, ask implementation vs. documentation, record answer, propose all changes together after all inconsistencies are resolved.
+
+---
+
+## Option 7 — Reports
 
 Run all checks and report findings. No edits.
 

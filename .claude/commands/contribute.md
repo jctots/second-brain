@@ -31,6 +31,7 @@ Also block these framework-path files — they exist in both repos but serve dif
 **Allowed exceptions under `personal/projects/second-brain-setup/`** (second-brain-setup SE docs, not private content):
 - `architecture.md`
 - `requirements.md`
+- `verification.md`
 
 Still block from that folder: `_memory.md`, `index.md`, `CLAUDE.md`, `decisions/`, `roadmap.md` — these are instance-specific.
 

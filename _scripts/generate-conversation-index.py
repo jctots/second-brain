@@ -70,6 +70,8 @@ def main():
         "",
         "# 💬 Conversations",
         "",
+        "[[dashboard|⬅️ Dashboard]]",
+        "",
     ]
 
     for month in sorted(by_month.keys(), reverse=True):
