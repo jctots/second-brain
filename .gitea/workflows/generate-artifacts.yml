@@ -10,7 +10,8 @@ jobs:
     steps:
       - name: Checkout
         run: |
-          git clone https://oauth2:${{ secrets.GITEA_TOKEN }}@git.3etn.net/${{ gitea.repository }}.git .
+          SERVER=$(echo "${{ gitea.server_url }}" | sed 's|^https://||')
+          git clone "https://oauth2:${{ secrets.GITEA_TOKEN }}@${SERVER}/${{ gitea.repository }}.git" .
           git config user.name "gitea-actions"
           git config user.email "actions@gitea"
 
@@ -43,5 +44,7 @@ jobs:
         run: |
           git add _conversations/index.md _conversations/pending-events.md personal/ professional/ public/ dashboard.md
           git ls-files --others --exclude-standard | grep '\.md$' | xargs -r git add || true
-          git diff --cached --quiet || git commit -m "chore: regenerate indexes, pending events, and PDF sidecars"
+          TRIGGER_SHA=$(git rev-parse --short ${{ gitea.sha }})
+          git diff --cached --quiet || git commit -m "chore: regenerate indexes, pending events, and PDF sidecars (from ${TRIGGER_SHA})"
           git push
+          git push origin HEAD:mobile

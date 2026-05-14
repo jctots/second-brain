@@ -82,15 +82,19 @@ Consolidate and budget AI-maintained files. Propose changes — apply only with 
 
 ## Option 5 — Resource note maintenance
 
-Read and reason about resource notes. Propose changes — apply only with user confirmation. Always use Edit, never Write.
+Use Qdrant via `rag-search.py` to find overlapping notes without loading all resource content into context. Propose changes — apply only with user confirmation. Always use Edit, never Write.
 
-Read all notes in `resources/` across `personal/`, `professional/`, and `public/`. For each pair or group with overlapping titles, tags, or content:
-- Summarize what each note covers
-- Propose one of: merge into one note, extract a shared concept into a new note, or keep separate with a cross-link (`*→ See also: [[...]]*`)
-- Show the proposed change (new or merged content) for user confirmation before writing
-- On confirm: write using Edit (existing note) or Write (new note); add cross-links where relevant
+1. List all notes under `resources/` across `personal/`, `professional/`, and `public/`.
+2. For each note, run `python _scripts/rag-search.py "<note title and topic>" --top 5` and check whether any top results come from a *different* resource note.
+3. Collect all flagged pairs (note A ↔ note B appearing in each other's top results).
+4. For each flagged pair: read both notes, summarize what each covers, then propose one of:
+   - Merge into one note
+   - Extract a shared concept into a new resource note
+   - Keep separate with a cross-link (`*→ See also: [[...]]*`)
+5. Show the proposed change for user confirmation before writing.
+   On confirm: use Edit for existing notes, Write for new notes.
 
-> **Note:** This step reads all resource notes — token cost scales with vault size. Without RAG (Phase 1), this is the only cross-note similarity mechanism available. Once RAG Phase 1 is complete, replace the full read with a Qdrant similarity query.
+**Score calibration note:** Similarity scores from Qdrant depend on the embedding model and content. Before treating any score as a threshold, run a few test queries on notes you know are similar and different, observe the score range, then use judgment. Do not apply a fixed cutoff without calibrating first.
 
 ---
 

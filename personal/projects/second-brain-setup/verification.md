@@ -11,6 +11,7 @@ Scenarios are identified as **T#.#** — first number is the test file, second i
 | T3 | `test_save_conversation.py` | `save-conversation.py` |
 | T4 | `test_generate_pending_events.py` | `generate-pending-events.py` |
 | T5 | `test_generate_dashboard.py` | `generate-dashboard.py` |
+| T6 | `test_rag_embed.py` | `rag-embed.py` — point ID stability, skip logic, chunking contracts |
 
 Fixtures are created in `tempfile.TemporaryDirectory` per test and cleaned up after. Smoke tests run against the real vault (Gitea CI — full content available).
 
@@ -18,29 +19,20 @@ Fixtures are created in `tempfile.TemporaryDirectory` per test and cleaned up af
 
 ## T1 — `test_hook_budget.py`
 
-Existing test. Scenarios document what it already enforces.
+This is a health check script, not a unit test file. It runs against the real vault — no isolated fixtures. When CI executes it, it reads the actual `_self/about.md`, `_self/rules.md`, and each active project's `CLAUDE.md` and `_memory.md`, and fails if any exceed 10,000 chars.
 
-### `check(label, n, failures, warnings)`
-
-| # | Scenario | Expected | Req |
-|---|---|---|---|
-| T1.1 | File is within limit and below 80% | Printed as `OK`, not added to failures or warnings | R6 |
-| T1.2 | File is at exactly 80% of limit (8,000 chars) | Printed as `WARN`, added to warnings, exit 0 | R6 |
-| T1.3 | File is above 80% but below 100% | Printed as `WARN`, added to warnings, exit 0 | R6 |
-| T1.4 | File exceeds 10,000 chars | Printed as `FAIL`, added to failures, exit 1 | R6 |
-
-### `main()`
+### `main()` — real vault health check
 
 | # | Scenario | Expected | Req |
 |---|---|---|---|
-| T1.5 | `_self/about.md` exists and within limit | Checked and reported as `OK` | R6 |
-| T1.6 | `_self/rules.md` exists and within limit | Checked and reported as `OK` | R6 |
-| T1.7 | `_self/about.md` is missing | Reported as `FAIL`, added to failures, exit 1 | R6, R11 |
-| T1.8 | `_self/rules.md` is missing | Reported as `FAIL`, added to failures, exit 1 | R6, R11 |
-| T1.9 | Project `CLAUDE.md` exists and within limit | Checked and reported as `OK` | R6 |
-| T1.10 | Project `_memory.md` exists and within limit | Checked and reported as `OK` | R6 |
-| T1.11 | Project filter arg provided (e.g. `personal/projects/my-project`) | Only matching project checked, others skipped | R6 |
-| T1.12 | No projects exist in any context | Only `_self/` files checked, no crash | R6, R11 |
+| T1.1 | `_self/about.md` exists and within limit | Checked and reported as `OK` | R6 |
+| T1.2 | `_self/rules.md` exists and within limit | Checked and reported as `OK` | R6 |
+| T1.3 | `_self/about.md` is missing | Reported as `FAIL`, added to failures, exit 1 | R6, R11 |
+| T1.4 | `_self/rules.md` is missing | Reported as `FAIL`, added to failures, exit 1 | R6, R11 |
+| T1.5 | Project `CLAUDE.md` exists and within limit | Checked and reported as `OK` | R6 |
+| T1.6 | Project `_memory.md` exists and within limit | Checked and reported as `OK` | R6 |
+| T1.7 | Project filter arg provided (e.g. `personal/projects/my-project`) | Only matching project checked, others skipped | R6 |
+| T1.8 | No projects exist in any context | Only `_self/` files checked, no crash | R6, R11 |
 
 ---
 
@@ -182,14 +174,13 @@ Existing test. Scenarios document what it already enforces.
 |---|---|---|---|
 | T3.31 | Valid transcript with ai-title | File written with correct frontmatter (title, session, projects, events) | R10 |
 | T3.32 | Existing file for same session ID found | Date field preserved, old file deleted if renamed | R10 |
-| T3.33 | Existing file has `[[wikilink]]`-format projects | Projects appear without `[[...]]` in new frontmatter | R10 |
-| T3.34 | stdin is empty | Exits 0, no file written | R11 |
-| T3.35 | stdin is invalid JSON | Exits 0, no file written | R11 |
-| T3.36 | `transcript_path` key missing | Exits 0, no file written | R11 |
-| T3.37 | Transcript file does not exist | Exits 0, no file written | R11 |
-| T3.38 | Transcript has no `ai-title` entry | Exits 0, no file written | R11 |
-| T3.39 | `_conversations/` directory does not exist in `cwd` | Exits 0, no file written — prevents writing to wrong repo root | R11 |
-| T3.40 | Transcript has messages but zero text segments | Frontmatter written, body effectively empty — no crash | R11 |
+| T3.33 | stdin is empty | Exits 0, no file written | R11 |
+| T3.34 | stdin is invalid JSON | Exits 0, no file written | R11 |
+| T3.35 | `transcript_path` key missing | Exits 0, no file written | R11 |
+| T3.36 | Transcript file does not exist | Exits 0, no file written | R11 |
+| T3.37 | Transcript has no `ai-title` entry | Exits 0, no file written | R11 |
+| T3.38 | `_conversations/` directory does not exist in `cwd` | Exits 0, no file written — prevents writing to wrong repo root | R11 |
+| T3.39 | Transcript has messages but zero text segments | Frontmatter written, body effectively empty — no crash | R11 |
 
 ---
 
@@ -275,6 +266,47 @@ Existing test. Scenarios document what it already enforces.
 
 ---
 
+## T6 — `test_rag_embed.py`
+
+### `make_point_id(file_path, heading, idx)`
+
+| # | Scenario | Expected |
+|---|---|---|
+| T6.22 | Same inputs called twice | Identical output — deterministic |
+| T6.23 | Different file paths, same heading and idx | Different IDs |
+| T6.24 | Same file and heading, different idx | Different IDs |
+| T6.25 | Any valid inputs | Output matches UUID format `8-4-4-4-12` lowercase hex |
+
+### `should_skip(rel)`
+
+| # | Scenario | Expected |
+|---|---|---|
+| T6.26 | Path has a part in SKIP_DIRS (e.g. `_conversations/note.md`) | Returns `True` |
+| T6.27 | Filename is `index.md` (any location) | Returns `True` |
+| T6.28 | Filename is `dashboard.md` | Returns `True` — generated file excluded from index |
+| T6.29 | Valid content path (`personal/areas/health/note.md`) | Returns `False` |
+
+### `split_sections(body)`
+
+| # | Scenario | Expected |
+|---|---|---|
+| T6.13 | Body with two `##` headings | Returns preamble + two section tuples |
+| T6.14 | Body with no headings | Returns `[("__preamble__", body)]` |
+| T6.15 | Body starts immediately with a `##` heading | No preamble entry |
+| T6.16 | Body has only a `#` (h1) heading | Not matched — treated as preamble |
+| T6.17 | Body has a `###` heading | Matched — pattern covers h2 and h3 |
+
+### `chunk_section(heading, body)`
+
+| # | Scenario | Expected |
+|---|---|---|
+| T6.18 | Body fits within MAX_CHARS (1200) | Single chunk, idx 0 |
+| T6.19 | Body exceeds MAX_CHARS | Multiple chunks; each advances MAX_CHARS − OVERLAP_CHARS (1000) |
+| T6.20 | Heading is `__preamble__` | No `## ` prefix in chunk text |
+| T6.21 | Normal heading | Chunk text prefixed with `## {heading}\n\n` |
+
+---
+
 ## Smoke tests (all scripts)
 
 | Script | Smoke assertion | Req |
@@ -286,3 +318,5 @@ Existing test. Scenarios document what it already enforces.
 | `save-conversation.py` | Exits 0 when given a valid transcript path | R10, R11 |
 | `generate-pending-events.py` | Exits 0; `_conversations/pending-events.md` written | R7, R10, R11 |
 | `generate-dashboard.py` | Exits 0; `dashboard.md` written | R7, R11 |
+| `rag-embed.py` (no args) | Exits 0; Qdrant `second_brain` collection exists, chunk count > 0 — requires live Qdrant + Ollama (configure via `.env`) | R5 |
+| `rag-search.py` | Exits 0 with a known query; at least one result printed — requires live Qdrant + Ollama (configure via `.env`) | R5 |

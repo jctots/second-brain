@@ -248,7 +248,7 @@ class TestCleanProjectName(unittest.TestCase):
         assert _sc.clean_project_name('"my-project"') == "my-project"
 
 
-# --- T3.31-T3.40: main() via subprocess ---
+# --- T3.31-T3.39: main() via subprocess ---
 
 class TestSaveConversationMain(unittest.TestCase):
 
@@ -302,25 +302,25 @@ class TestSaveConversationMain(unittest.TestCase):
             texts = [f.read_text(encoding="utf-8") for f in files]
             assert any("2026-01-01" in f.name for f in files), "date should be preserved"
 
-    def test_t3_34_empty_stdin(self):
+    def test_t3_33_empty_stdin(self):
         rc, _ = run_script("")
         assert rc == 0
 
-    def test_t3_35_invalid_json_stdin(self):
+    def test_t3_34_invalid_json_stdin(self):
         rc, _ = run_script("not json")
         assert rc == 0
 
-    def test_t3_36_missing_transcript_path_key(self):
+    def test_t3_35_missing_transcript_path_key(self):
         rc, _ = run_script(json.dumps({"cwd": str(REPO)}))
         assert rc == 0
 
-    def test_t3_37_transcript_does_not_exist(self):
+    def test_t3_36_transcript_does_not_exist(self):
         with tempfile.TemporaryDirectory() as d:
             hook = json.dumps({"transcript_path": str(Path(d) / "ghost.jsonl"), "cwd": str(d)})
             rc, _ = run_script(hook)
             assert rc == 0
 
-    def test_t3_38_no_ai_title(self):
+    def test_t3_37_no_ai_title(self):
         with tempfile.TemporaryDirectory() as d:
             cwd = Path(d)
             (cwd / "_conversations").mkdir()
@@ -334,7 +334,7 @@ class TestSaveConversationMain(unittest.TestCase):
             assert rc == 0
             assert list((cwd / "_conversations").rglob("*.md")) == []
 
-    def test_t3_39_no_conversations_dir(self):
+    def test_t3_38_no_conversations_dir(self):
         with tempfile.TemporaryDirectory() as d:
             t = Path(d) / "t.jsonl"
             make_transcript(t, basic_transcript("Test"))
@@ -343,7 +343,7 @@ class TestSaveConversationMain(unittest.TestCase):
             assert rc == 0
             assert not (Path(d) / "_conversations").exists()
 
-    def test_t3_40_zero_text_segments_no_crash(self):
+    def test_t3_39_zero_text_segments_no_crash(self):
         with tempfile.TemporaryDirectory() as d:
             cwd = Path(d)
             (cwd / "_conversations").mkdir()
