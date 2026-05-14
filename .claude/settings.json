@@ -1,4 +1,10 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(python _scripts/*)",
+      "Bash(python _tests/*)"
+    ]
+  },
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -29,7 +35,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python _scripts/inject-rules.py"
+            "command": "python _scripts/inject-corrections.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python _scripts/inject-context-rag.py"
           }
         ]
       }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""T2 — Tests for inject-profile.py, inject-rules.py, inject-context-claude.py, inject-context-memory.py"""
+"""T2 — Tests for inject-profile.py, inject-corrections.py, inject-context-claude.py, inject-context-memory.py"""
 import importlib.util
 import json
 import subprocess
@@ -81,17 +81,17 @@ class TestIsFirstTurn(unittest.TestCase):
             assert _profile.is_first_turn(str(t)) is True
 
 
-# --- T2.7-T2.14: inject-profile.py / inject-rules.py main() ---
+# --- T2.7-T2.14: inject-profile.py / inject-corrections.py main() ---
 
 class TestInjectProfileMain(unittest.TestCase):
 
-    def _vault(self, d, about=None, rules=None):
+    def _vault(self, d, about=None, corrections=None):
         vault = Path(d)
         (vault / "_self").mkdir(exist_ok=True)
         if about is not None:
             (vault / "_self/about.md").write_text(about, encoding="utf-8")
-        if rules is not None:
-            (vault / "_self/rules.md").write_text(rules, encoding="utf-8")
+        if corrections is not None:
+            (vault / "_self/corrections.md").write_text(corrections, encoding="utf-8")
         return vault
 
     def test_t2_7_profile_first_turn(self):
@@ -104,13 +104,13 @@ class TestInjectProfileMain(unittest.TestCase):
             assert rc == 0
             assert "Systems engineer." in out
 
-    def test_t2_8_rules_first_turn(self):
+    def test_t2_8_corrections_first_turn(self):
         with tempfile.TemporaryDirectory() as d:
-            vault = self._vault(d, rules="# Rules\nBe terse.")
+            vault = self._vault(d, corrections="# Corrections\nBe terse.")
             t = Path(d) / "t.jsonl"
             make_transcript([{"type": "user"}], t)
             hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "hello"})
-            rc, out = run_script("inject-rules.py", hook)
+            rc, out = run_script("inject-corrections.py", hook)
             assert rc == 0
             assert "Be terse." in out
 
@@ -444,9 +444,9 @@ class TestSmoke(unittest.TestCase):
         rc, _ = run_script("inject-profile.py", hook)
         assert rc == 0
 
-    def test_smoke_inject_rules(self):
+    def test_smoke_inject_corrections(self):
         hook = json.dumps({"cwd": str(REPO), "prompt": "hello"})
-        rc, _ = run_script("inject-rules.py", hook)
+        rc, _ = run_script("inject-corrections.py", hook)
         assert rc == 0
 
     def test_smoke_inject_context_claude(self):

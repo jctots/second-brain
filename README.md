@@ -44,7 +44,8 @@ For technical detail on context injection and automation boundaries, see [docs/c
 | Automatic memory               | ✓ (no action needed)       | —                   | —              | —                |
 | Memory — user-owned, versioned | —                          | —                   | ✓              | ✓                |
 | Active capture                 | —                          | —                   | ✓ `/distill`   | ✓ `/distill`     |
-| Active retrieval               | —                          | —                   | ✓ keyword      | ✓ RAG            |
+| Active retrieval               | —                          | —                   | —              | ✓ RAG            |
+| AI sees your content           | ✓                          | —                   | ✓ (Anthropic)  | —                |
 | Local files / ownership        | —                          | ✓                   | ✓              | ✓                |
 | Version control                | —                          | plugin needed       | ✓              | ✓                |
 | Output files versioned         | —                          | —                   | ✓              | ✓                |
@@ -53,7 +54,7 @@ For technical detail on context injection and automation boundaries, see [docs/c
 | Data stays on machine          | —                          | ✓                   | —              | ✓                |
 | Setup complexity               | none                       | low                 | medium         | high             |
 
-*For known limitations and planned improvements, see [evolution.md](docs/evolution.md).*
+*For known limitations and planned improvements, see [limitations-and-roadmap.md](docs/limitations-and-roadmap.md).*
 
 ## 🚀 Deployment tiers
 

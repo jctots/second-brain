@@ -21,6 +21,7 @@ created: 2026-04-29
 | A1 | Memory capture model | Vault-native; `/remember` judgment pass; markers as visual + backstop signal; `/maintain` consolidates | [§ A1](#a1--memory-capture-model) |
 | A2 | Gitea Actions workflows | CI owns derived artifacts; local hooks only block bad commits | [§ A2](#a2--gitea-actions-workflows) |
 | A3 | Hook guarantee | If a behavior must happen every session without fail, it needs a hook — instructions are not guaranteed | [§ Claude Code interface](#claude-code-interface) |
+| A4 | RAG degrades to nothing | RAG is an enhancement, not a dependency — all invocation points exit cleanly when services are unavailable or unconfigured | [§ RAG pipeline](#rag-pipeline) |
 
 ---
 
@@ -53,6 +54,12 @@ created: 2026-04-29
   - [Tier 2 — Private cloud](#tier-2--private-cloud-1)
   - [Tier 3 — Self-hosted](#tier-3--self-hosted-1)
   - [Feature degradation](#feature-degradation)
+- [RAG pipeline](#rag-pipeline)
+  - [Components](#rag-components)
+  - [Data model](#data-model)
+  - [Invocation points](#invocation-points)
+  - [Graceful degradation](#graceful-degradation)
+  - [Configuration](#rag-configuration)
 - [Verification](#verification)
 - [Key constraints satisfied](#key-constraints-satisfied)
 - [Artifact ecosystem](#artifact-ecosystem)
@@ -143,14 +150,16 @@ AI reasoning layer. Operates on the vault as a tool-using agent: reads files, ed
 **Consumes:** vault via filesystem tools; context via hook-injected files
 **Does not own:** the vault (it assists, not governs); always-on processes
 
-**Context loading at session start (hook-guaranteed):**
+**Context loading (hook-guaranteed, every turn):**
 
 ```
 UserPromptSubmit fires
-  → inject-profile.py         → injects _self/about.md summary
-  → inject-rules.py           → injects _self/rules.md summary
-  → inject-context-claude.py  → detects project, injects project CLAUDE.md
-  → inject-context-memory.py  → detects project, injects project _memory.md
+  → inject-profile.py         → injects _self/about.md summary          (first turn only)
+  → inject-corrections.py           → injects _self/corrections.md summary          (first turn only)
+  → inject-context-claude.py  → detects project, injects project CLAUDE.md  (first turn only)
+  → inject-context-memory.py  → detects project, injects project _memory.md (first turn only)
+  → inject-context-rag.py     → embeds message, queries Qdrant, injects matching note titles
+                                 (every turn; silent if RAG unavailable)
 ```
 
 ---
@@ -172,19 +181,19 @@ Python scripts callable both from Claude Code hooks and Gitea Actions CI. No ext
 | Script | Called by | Purpose |
 |---|---|---|
 | `inject-profile.py` | Hook (`UserPromptSubmit`) | Inject `_self/about.md` summary |
-| `inject-rules.py` | Hook (`UserPromptSubmit`) | Inject `_self/rules.md` summary |
+| `inject-corrections.py` | Hook (`UserPromptSubmit`) | Inject `_self/corrections.md` summary |
 | `inject-context-claude.py` | Hook (`UserPromptSubmit`) | Detect project, inject project `CLAUDE.md` |
 | `inject-context-memory.py` | Hook (`UserPromptSubmit`) | Detect project, inject project `_memory.md` |
-| `inject-context-project.py` | Hook (`UserPromptSubmit`) | Detect project via Qdrant embedding (Tier 2/3) or keyword match (Tier 1 fallback); inject project `CLAUDE.md` + `_memory.md` — replaces `inject-context-claude.py` + `inject-context-memory.py` on Tier 2/3 |
-| `inject-context-rag.py` | Hook (`UserPromptSubmit`) | Inject relevant note titles (Qdrant top-3 above threshold); fulfill `📖 [retrieve: path]` markers from previous turn by injecting full file content |
+| `inject-context-project.py` *(planned)* | Hook (`UserPromptSubmit`) | Detect project via Qdrant embedding (Tier 2/3) or keyword match (Tier 1 fallback); inject project `CLAUDE.md` + `_memory.md` — replaces `inject-context-claude.py` + `inject-context-memory.py` on Tier 2/3 |
+| `inject-context-rag.py` | Hook (`UserPromptSubmit`) | Embed user message via Ollama, query Qdrant top-3 above similarity threshold, inject matching note titles + file paths. Fires every turn. Degrades gracefully — exits 0 with no output when RAG is unconfigured or unreachable. |
 | `save-conversation.py` | Hook (`Stop`, `SessionEnd`) | Save session transcript to `_conversations/`; scan for event markers; write `events`/`processed` frontmatter |
 | `generate-conversation-index.py` | CI (`generate-artifacts.yml`), `/maintain` | Regenerate `_conversations/index.md` |
 | `generate-project-indices.py` | CI (`generate-artifacts.yml`), `/maintain` | Regenerate `## files`, `## relevant conversations`, and `## quick status` in each project `index.md` |
 | `generate-dashboard.py` | CI (`generate-artifacts.yml`), `/maintain` | Regenerate `dashboard.md` — `## active projects` table (quick status) + context TOC (resources grouped by cluster tags) |
 | `generate-pending-events.py` | CI (`generate-artifacts.yml`), `/maintain` | Scan conversations for unprocessed events; write `_conversations/pending-events.md` |
 | `generate-pdf-sidecars.py` | CI (`generate-artifacts.yml`) | Generate Markdown sidecars for PDFs — text-layer via pdfplumber; image PDFs via tesseract OCR (external deps: pdfplumber, pypdfium2, pytesseract; installed via CI venv) |
-| `embed-vault.py` | CI (`embed-vault.yml`), manual | Walk vault, chunk by heading (H2/H3), embed via Ollama (`embeddinggemma:latest`), upsert into Qdrant with metadata (path, para, context, project, tags) |
-| `search-vault.py` | `/search` slash command | Embed query string, query Qdrant, return top-5 ranked results (score · path · heading · snippet) |
+| `rag-embed.py` | CI (`rag-embed-vault.yml`), manual | Walk vault, chunk by heading (H2/H3 with overlap), embed via Ollama (`embeddinggemma:latest`), upsert into Qdrant with metadata (path, para, context, project, tags). Supports `--files`/`--deleted` for incremental CI runs. |
+| `rag-search.py` | `/search`, `/maintain` option 5 | Embed query string, query Qdrant, return top-5 ranked results (score · path · heading · snippet). Exits cleanly with a user-readable message when RAG is unconfigured or unreachable. |
 
 ---
 
@@ -194,11 +203,13 @@ Python scripts callable both from Claude Code hooks and Gitea Actions CI. No ext
 
 ```
 User opens VSCode → types first message
-  → UserPromptSubmit hook fires (guaranteed)
-      inject-profile.py         → _self/about.md → prepended to Claude's context
-      inject-rules.py           → _self/rules.md → prepended to Claude's context
-      inject-context-claude.py  → project CLAUDE.md → prepended to Claude's context
-      inject-context-memory.py  → project _memory.md → prepended to Claude's context
+  → UserPromptSubmit hook fires (guaranteed, every turn)
+      inject-profile.py         → _self/about.md → prepended to context     (first turn)
+      inject-corrections.py           → _self/corrections.md → prepended to context     (first turn)
+      inject-context-claude.py  → project CLAUDE.md → prepended to context  (first turn)
+      inject-context-memory.py  → project _memory.md → prepended to context (first turn)
+      inject-context-rag.py     → queries Qdrant, injects matching note titles (every turn;
+                                   silent if RAG unavailable)
   → Claude sees: hooks output + user message + root CLAUDE.md
 ```
 
@@ -235,7 +246,7 @@ During a conversation, the AI emits inline markers when capture-worthy moments o
 | `👤 [profile event]` | `profile` | Profile fact or behavioral correction |
 | `🗂️ [distill event]` | `distill` | Lasting reference value: technology analysis, tool comparisons, design patterns |
 | `✅ [task event]` | `task` | Concrete next action for the user |
-| `📖 [retrieve: path]` | — | Full content load request; processed by `inject-context-rag.py` hook on next turn |
+| `📖 [retrieve: path]` | — | Visual signal only — Claude reads the file directly when user confirms; no hook processing |
 
 **Processed markers (emitted by slash commands):**
 
@@ -253,7 +264,7 @@ During a conversation, the AI emits inline markers when capture-worthy moments o
 ```
 User runs /remember
   → scans current conversation for 🧠 markers
-      → routes each to target file (_memory.md, decisions/, _self/about.md, _self/rules.md)
+      → routes each to target file (_memory.md, decisions/, _self/about.md, _self/corrections.md)
       → writes using Edit (never Write)
   → scans current conversation for ✅ markers
       → routes tasks to project roadmap.md or _memory.md next actions
@@ -354,9 +365,9 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 
 #### Feedback injection (`UserPromptSubmit`)
 
-**File:** `_scripts/inject-rules.py`
+**File:** `_scripts/inject-corrections.py`
 **Fires on:** Every `UserPromptSubmit`, self-limits to first turn only
-**What it does:** Reads `_self/rules.md` and outputs the full file content.
+**What it does:** Reads `_self/corrections.md` and outputs the full file content.
 **Budget:** ≤ 10,000 chars (warn at 8,000; consolidation target 5,000).
 
 ---
@@ -378,21 +389,19 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 
 ---
 
-#### RAG title injection + content retrieval (`UserPromptSubmit`) — Tier 2/3
+#### RAG passive surfacing (`UserPromptSubmit`) — Tier 2/3
 
 **File:** `_scripts/inject-context-rag.py`
 **Fires on:** Every `UserPromptSubmit` (every turn)
-**What it does:**
-1. Embeds the user's message via Ollama (`embeddinggemma:latest`); queries Qdrant for top-3 results above similarity threshold; injects relevant note titles + file paths.
-2. Scans the previous Claude response for `📖 [retrieve: path]` markers; reads each file and injects full content.
+**What it does:** Embeds the user's message via Ollama (`embeddinggemma:latest`); queries Qdrant for top-3 results above the similarity threshold (0.55); injects matching note titles + file paths as a `## Relevant vault notes` block. Claude reads files directly via its tools when the user confirms a suggested note.
 
-**Degrades gracefully:** outputs nothing if Qdrant or Ollama is unreachable.
-**Budget:** total output ≤ 8,000 chars (warn threshold).
+**Degrades gracefully:** exits 0 with no output if hosts are unconfigured or services are unreachable.
+**Budget:** output is titles only — typically a few lines; well within budget.
 **Tier:** Tier 2/3 only — requires Qdrant and Ollama.
 
 ---
 
-#### Project context injection via RAG (`UserPromptSubmit`) — Tier 2/3
+#### Project context injection via RAG (`UserPromptSubmit`) — Tier 2/3 *(planned)*
 
 **File:** `_scripts/inject-context-project.py`
 **Fires on:** Every `UserPromptSubmit`, self-limits to first turn only
@@ -418,9 +427,9 @@ Claude emits visual markers mid-conversation when it notices something worth cap
 |---|---|---|
 | 🧠 `[memory event]` | Project state, decision, open question | `/remember` (normal path) or `/maintain` backstop |
 | ✅ `[task event]` | Concrete next action | Visual only — absorbed into 🧠 if worth persisting |
-| 👤 `[profile event]` | Profile fact or behavioral correction | `/remember` inline (facts → `_self/about.md`, corrections → `_self/rules.md`) or `/maintain` backstop |
+| 👤 `[profile event]` | Profile fact or behavioral correction | `/remember` inline (facts → `_self/about.md`, corrections → `_self/corrections.md`) or `/maintain` backstop |
 | 🗂️ `[distill event]` | Lasting reference value beyond this project | `/distill` |
-| 📖 `[retrieve: path]` | Full content load request for a vault note | `inject-context-rag.py` hook — fulfills on the next turn by injecting the file content |
+| 📖 `[retrieve: path]` | Vault note flagged as relevant by RAG surfacing | Visual signal only — Claude reads the file directly when user confirms; no hook processing |
 
 #### `/remember` — judgment pass
 
@@ -433,13 +442,13 @@ Output: one appended block per target file. Always appends — never edits in-pl
 - [what was captured]
 ```
 
-`/remember` writes to project `_memory.md` always, and to `_self/about.md` or `_self/rules.md` when 👤 profile content is present. All target files are append-only — never edits sections in-place. It does not scan markers — the full conversation is the signal.
+`/remember` writes to project `_memory.md` always, and to `_self/about.md` or `_self/corrections.md` when 👤 profile content is present. All target files are append-only — never edits sections in-place. It does not scan markers — the full conversation is the signal.
 
 #### `/maintain` — backstop and consolidation
 
 Two jobs:
 
-**Backstop** — for past conversations where `/remember` was not run, `/maintain` scans 🧠 and 👤 markers. 🧠 markers are appended to `_memory.md`; 👤 markers are routed to `_self/about.md` or `_self/rules.md` with judgment.
+**Backstop** — for past conversations where `/remember` was not run, `/maintain` scans 🧠 and 👤 markers. 🧠 markers are appended to `_memory.md`; 👤 markers are routed to `_self/about.md` or `_self/corrections.md` with judgment.
 
 **Consolidation** — when `_memory.md` or `_self/` files exceed 8,000 chars, `/maintain` merges appended `<!-- remembered: -->` blocks into the structured sections, routes aging content to `decisions/` or drops it, and targets ≤ 5,000 chars post-consolidation. Dropped items are intentional — working memory fades.
 
@@ -464,7 +473,7 @@ Two jobs:
 |---|---|---|---|
 | `generate-artifacts.yml` | Gitea Actions | Push to `main` | Runs generate scripts (conversation index, project indices, dashboard, pending events, PDF sidecars); commits updated artifacts |
 | `perform-tests.yml` | Gitea Actions | Push to `main`, PR | Runs T1–T5 (all test files in `_tests/`) |
-| `embed-vault.yml` | Gitea Actions | Push to `main` (when `.md` files change) | Incrementally re-embeds changed vault files into Qdrant (Tier 2/3 only) |
+| `rag-embed-vault.yml` | Gitea Actions | Push to `main` (when `.md` files change) | Incrementally re-embeds changed vault files into Qdrant (Tier 2/3 only); skips cleanly if OLLAMA_HOST/QDRANT_HOST secrets not set |
 | Framework tests | GitHub Actions | Push to public fork | Runs `_tests/` against framework files only |
 
 ---
@@ -482,7 +491,7 @@ Two jobs:
 | Behavior | Mechanism | Reliable? |
 |---|---|---|
 | Load `_self/about.md` summary | Hook (`inject-profile.py`) | Yes — guaranteed first turn |
-| Load `_self/rules.md` | Hook (`inject-rules.py`) | Yes — guaranteed first turn |
+| Load `_self/corrections.md` | Hook (`inject-corrections.py`) | Yes — guaranteed first turn |
 | Load project `CLAUDE.md` | Hook (`inject-context-claude.py`) | Yes — if project name is in first message |
 | Load project `_memory.md` | Hook (`inject-context-memory.py`) | Yes — if project name is in first message |
 | Infer context and confirm with user | CLAUDE.md instruction | No — can be missed |
@@ -505,7 +514,7 @@ Workspace-scoped memory (`.claude/projects/.../memory/`) is **not used in this r
 | File | Content | Injected by |
 |---|---|---|
 | `_self/about.md` | Profile + behavioral patterns | `inject-profile.py` |
-| `_self/rules.md` | Feedback rules and corrections | `inject-rules.py` |
+| `_self/corrections.md` | Feedback rules and corrections | `inject-corrections.py` |
 | project `_memory.md` | Project state + open questions | `inject-context-memory.py` |
 
 These files travel with the repo, are git-versioned, and are readable in Obsidian. Workspace-scoped memory is machine-local, not vault-portable, and invisible to Obsidian/Foam — retired for these reasons. See [[second-brain-setup/decisions/D124-vault-native-memory-design-markers-judgment-pass-maintain-ba|D124]] for the full tradeoff analysis.
@@ -523,7 +532,7 @@ Location: `.claude/commands/`
 | `/distill` | Periodic — process 🗂️ event markers from current conversation into `resources/` notes |
 | `/maintain` | Periodic vault operations — 7 options: generate artifacts, inbox processing, event processing, memory maintenance, resource note maintenance, documentation maintenance, reports |
 | `/sync` | Git operations — commit staged work, check or pull framework updates |
-| `/search` | Query vault — Tier 1: keyword search (ripgrep); Tier 2/3: semantic search via Qdrant (`search-vault.py`) using `embeddinggemma:latest` |
+| `/search` | Query vault by semantic similarity — calls `rag-search.py` (Ollama + Qdrant). Prints "RAG not configured" or "RAG unavailable" if services are absent; no Tier 1 fallback. |
 | `/contribute` | Contribute framework improvements to upstream GitHub |
 
 Adding a new command: create `.claude/commands/{name}.md`. No registration required. Avoid names that conflict with built-in Claude Code skills — built-ins take precedence on name collision.
@@ -537,7 +546,7 @@ Adding a new command: create `.claude/commands/{name}.md`. No registration requi
 |---|---|---|
 | Save conversation to `_conversations/` | Hook (`Stop` + `SessionEnd`) | Guaranteed |
 | Load `_self/about.md` at session start | Hook (`inject-profile.py`) | Guaranteed — first turn only |
-| Load `_self/rules.md` at session start | Hook (`inject-rules.py`) | Guaranteed — first turn only |
+| Load `_self/corrections.md` at session start | Hook (`inject-corrections.py`) | Guaranteed — first turn only |
 | Load project `CLAUDE.md` | Hook (`inject-context-claude.py`) | Guaranteed if project name in first message |
 | Load project `_memory.md` | Hook (`inject-context-memory.py`) | Guaranteed if project name in first message |
 | Emit event markers mid-conversation | CLAUDE.md instruction | Unreliable — mitigated by `/remember` judgment pass |
@@ -547,7 +556,7 @@ Adding a new command: create `.claude/commands/{name}.md`. No registration requi
 | `/remember` trigger | User-invoked slash command | Reliable — user-triggered; session-scoped |
 | `/distill` trigger | User-invoked slash command | Reliable — user-triggered; cross-session |
 | `/maintain` trigger | User-invoked slash command | Reliable — user-triggered; periodic |
-| RAG title injection + content retrieval (Tier 2/3) | Hook (`inject-context-rag.py`, `UserPromptSubmit`) | Guaranteed if Qdrant + Ollama reachable; silent skip if unreachable |
+| RAG passive surfacing (Tier 2/3) | Hook (`inject-context-rag.py`, `UserPromptSubmit`) | Every turn; exits 0 with no output if Qdrant or Ollama is unreachable |
 | Project context injection via RAG (Tier 2/3) | Hook (`inject-context-project.py`, `UserPromptSubmit`) | Guaranteed first turn if Qdrant + Ollama reachable; keyword fallback to Tier 1 |
 
 ---
@@ -631,6 +640,97 @@ Use the local model path for sensitive-content queries and simple tasks. Complex
 
 ---
 
+## RAG pipeline
+
+Semantic search over vault content using Ollama embeddings and Qdrant vector storage. Tier 2/3 only — requires both services reachable. Implements A4: degrades to nothing when unavailable.
+
+---
+
+### RAG components
+
+| Component | Role |
+|---|---|
+| `rag-embed.py` | Walk vault, chunk by heading (H2/H3 with sliding overlap windows), embed via Ollama, upsert into Qdrant. `--files`/`--deleted` args enable incremental CI runs. |
+| `rag-search.py` | Embed query string via Ollama, query Qdrant top-5, return score · path · heading · snippet. |
+| `rag-embed-vault.yml` | CI trigger: runs on push to `main` when `.md` files change; incremental by default (HEAD~1 diff); `workflow_dispatch` for full re-index. |
+
+---
+
+### Data model
+
+Qdrant collection: `second_brain` — cosine similarity, 768-dim vectors (matching `embeddinggemma:latest`).
+
+Each point:
+
+| Field | Value |
+|---|---|
+| ID | Deterministic SHA-1 UUID from `file_path:heading:chunk_index` — prevents silent duplicates on re-index |
+| Vector | 768-dim embedding from `embeddinggemma:latest` |
+| `file_path` | Vault-relative path, forward-slash normalized |
+| `heading` | H2/H3 heading text, or `__preamble__` |
+| `para_category` | `projects`, `areas`, `resources`, or `archive` |
+| `context` | `personal`, `professional`, or `public` |
+| `project` | Project folder name if applicable |
+| `tags` | Frontmatter tags |
+| `snippet` | First 300 chars of chunk text |
+
+Chunking: heading-based sections split at H2/H3 boundaries; sections > 1200 chars split into sliding windows (1200-char window, 200-char overlap). Sections < 50 chars skipped.
+
+Exclusions: only files under `PARA_ROOTS = {"personal", "professional", "public"}` are indexed — everything else (`.git`, `.claude`, `_conversations`, `_tests`, `_scripts`, `_self`, `_daily`, etc.) is implicitly skipped. Within PARA_ROOTS: `SKIP_DIRS = {"tags"}`, `SKIP_FILES = {"index.md", "CLAUDE.md", "_memory.md"}`.
+
+Note: deleting a file from the vault requires the `--deleted` flag on re-index — stale Qdrant points persist on re-upsert because Qdrant has no bulk-delete-by-source-file primitive. The CI workflow passes `--deleted` for files removed in the push.
+
+---
+
+### Invocation points
+
+| Caller | Script | Behavior when RAG unavailable |
+|---|---|---|
+| `UserPromptSubmit` hook | `inject-context-rag.py` | Exits 0, no output — Claude sees nothing; no impact on conversation |
+| `/search` | `rag-search.py` | Prints message, exits 0 — Claude relays it |
+| `/maintain` option 5 | `rag-search.py` (once per resource note) | Prints message on first call, option aborts cleanly |
+| CI `rag-embed-vault.yml` | `rag-embed.py` | Exits 0 if not configured; exits 1 if configured-but-down (red CI run alerts user) |
+
+---
+
+### Graceful degradation
+
+A4: all invocation points produce a user-readable message rather than a Python traceback.
+
+| Scenario | Detection | `rag-search.py` | `rag-embed.py` | CI |
+|---|---|---|---|---|
+| Not configured | `OLLAMA_HOST` or `QDRANT_HOST` env var is empty | Prints "RAG not configured", exits 0 | Prints "RAG not configured — skipping", exits 0 | Step exits 0 (green) |
+| Ollama unreachable | `URLError` on embed call | Prints "RAG unavailable — Ollama unreachable: ...", exits 0 | All chunks warn, 0 upserted → prints error, exits 1 | Step exits 1 (red) |
+| Qdrant unreachable | `URLError` on `ensure_collection` or search | Prints "RAG unavailable — Qdrant unreachable: ...", exits 0 | `ensure_collection` fails → prints error, exits 1 | Step exits 1 (red) |
+| Partial chunk failures | `Exception` on some embed calls mid-run | N/A | Warns per chunk, continues; exits 0 if any chunks succeeded | Step exits 0 (green) |
+
+**Why different exit codes between search and embed when services are down:** `rag-search.py` exits 0 so `/search` and `/maintain` receive a readable message Claude can relay. `rag-embed.py` exits 1 when configured-but-down so CI fails and alerts that incremental embedding was skipped.
+
+**Why different exit codes between not-configured and down on embed:** not-configured is expected on Tier 1 and Tier 2/3 instances without RAG — a red CI run there would be noise on every push. Configured-but-down is unexpected and worth a CI alert.
+
+**Ollama-down detection:** if all embed attempts fail (`embed_failures > 0 and total_chunks == 0`), the script exits 1. Partial failures (some chunks succeed) exit 0 — transient per-chunk errors are treated as acceptable degradation.
+
+**Configuration source:** hosts (`OLLAMA_HOST`, `QDRANT_HOST`) have no Python-level fallback default — they must come from `.env` or a real env var. Ports (`OLLAMA_PORT`, `QDRANT_PORT`) default to standard values (11434, 6333). Any instance without `.env` entries for the hosts correctly hits the "not configured" path rather than attempting a connection to an arbitrary IP. On Gitea Actions, missing secrets evaluate to empty strings — also caught by the empty-host check.
+
+---
+
+### RAG configuration
+
+Environment variables — loaded from `.env` at vault root (gitignored), or injected as CI secrets.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `OLLAMA_HOST` | (none — RAG disabled if empty) | Ollama hostname or IP |
+| `OLLAMA_PORT` | `11434` | |
+| `OLLAMA_API_KEY` | (none) | Optional — home lab threat model has no key |
+| `QDRANT_HOST` | (none — RAG disabled if empty) | Qdrant hostname or IP |
+| `QDRANT_PORT` | `6333` | |
+| `QDRANT_API_KEY` | (none) | Optional |
+
+`.env.example` at vault root documents the expected variables. `.env` is gitignored — never committed.
+
+---
+
 ## Verification
 
 Test scripts in `_tests/` verify requirements automatically. They run in Gitea Actions on every push to `main` (`.gitea/workflows/perform-tests.yml`). Each script is named after the requirement it covers.
@@ -642,6 +742,9 @@ Test scripts in `_tests/` verify requirements automatically. They run in Gitea A
 | `test_save_conversation.py` | R10, R11 | Event marker extraction, conversation file writing, frontmatter |
 | `test_generate_pending_events.py` | R7, R10, R11 | Pending events generation — frontmatter parsing, output format, resilience |
 | `test_generate_dashboard.py` | R7, R11 | Dashboard generation — resource collection, quick status parsing, tag pages |
+| `test_rag_embed.py` | R12 | `rag-embed.py` — point ID stability, skip logic, chunking contracts, graceful degradation |
+| `test_rag_search.py` | R12 | `rag-search.py` — graceful degradation (not configured, services down, happy path) |
+| `test_inject_context_rag.py` | R11, R12 | `inject-context-rag.py` — H1 extraction, graceful degradation, threshold filtering, deduplication, output format |
 
 Tests are deterministic pass/fail scripts — stdlib Python only (R2), no Claude session required. When a test fails, CI blocks. Add a new test whenever a requirement becomes mechanically checkable.
 
@@ -777,7 +880,7 @@ Three levels. Each serves a different reader.
 | Setup steps | `docs/getting-started.md` | — |
 | Hook or context injection behavior | `docs/claude-integration.md` | `architecture.md` if a component interface changes |
 | Privacy / data handling | `PRIVACY.md` | — |
-| Known limitations or roadmap | `docs/evolution.md` | — |
+| Known limitations or roadmap | `docs/limitations-and-roadmap.md` | — |
 | Deployment tier detail | `docs/getting-started.md` | `docs/private-cloud-setup.md` or `docs/self-hosted-setup.md` |
 | Repo layout or contribution workflow | `CONTRIBUTING.md` | — |
 | System architecture or component interfaces | `architecture.md` (this file) | — |

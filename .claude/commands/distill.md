@@ -9,7 +9,7 @@ Invoked as `/distill`
 1. **Scan for distill events** — look back through this conversation for 🗂️ `[distill event]` markers. If none found, tell the user and stop.
 
 2. **Process each event, one at a time:**
-   a. **Check for existing notes** — grep `resources/` across all contexts for notes with overlapping titles or tags. If a close match exists, read it and decide: propose updating the existing note instead of creating a new one.
+   a. **Check for existing notes** — run `python _scripts/rag-search.py "<proposed note title and topic summary>" --top 5`. Filter results to paths under `resources/`. If any score ≥ 0.55, read those notes and decide: propose updating the existing note (or adding a cross-link) instead of creating a new one.
    b. Draft the note content — structured, concise, suitable for `resources/`. Default path: `personal/resources/`; use `public/resources/` only if the user explicitly requests it.
    c. Show: proposed path (existing or new), draft content, and a one-line reason for placing it there.
    d. Engage interactively — the user may add context, redirect scope, change the path, or ask for revisions. Iterate until the user explicitly confirms or skips the item.
@@ -35,7 +35,7 @@ Use when you want to mine an existing document for portable concepts worth keepi
 3. **Make a judgment pass** — identify remaining sections that contain portable concepts: general patterns, mental models, design frameworks, technology assessments, architectural principles. Skip system-specific implementation details (config values, script names, instance-specific decisions) — those belong in the source file.
 
 4. **For each candidate, one at a time:**
-   a. **Check for existing notes** — grep `resources/` across all contexts for notes with overlapping titles or tags. If a close match exists, read it and decide: propose updating the existing note instead of creating a new one.
+   a. **Check for existing notes** — run `python _scripts/rag-search.py "<proposed note title and topic summary>" --top 5`. Filter results to paths under `resources/`. If any score ≥ 0.55, read those notes and decide: propose updating the existing note (or adding a cross-link) instead of creating a new one.
    b. Propose a path in `personal/resources/` by default; use `public/resources/` only if the user explicitly requests it. Existing path if updating.
    c. Draft a self-contained atomic note — structured, readable without the source file.
    d. Show: proposed path, draft content, one-line reason. If updating an existing note, show a diff-style summary of what would change.

@@ -66,7 +66,7 @@ Initialize a new vault entry (project, area, or resource). Execute in order:
 
    Additional per-file substitutions:
    - `index.md`: replace description placeholder with user's description; leave `## relevant conversations` empty (no wikilinks — the conversation hasn't been saved yet); strip the HTML comment block at the top
-   - `CLAUDE.md`: replace "What this project is" body with user's description; replace the project-specific guidance placeholder in "On sync memory" with `Strategy changes, tool choices, design tradeoffs; not routine implementation details.`; strip the HTML comment block at the top
+   - `CLAUDE.md`: replace "What this project is" body with user's description; replace the project-specific guidance placeholder in "On /remember" with `Strategy changes, tool choices, design tradeoffs; not routine implementation details.`; strip the HTML comment block at the top
    - `_memory.md`: replace Current status body with `Project initialized. No work started yet.`; strip the HTML comment block at the top
    - `reference.md`: replace `{Section}` heading and body with `## Brief` / description and confirmed inputs; if you researched inputs in step 1, populate the relevant sections now with findings (API schemas, setup notes, links) — do not leave research results as placeholders; strip the HTML comment block at the top
 

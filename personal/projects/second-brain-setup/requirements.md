@@ -28,7 +28,8 @@ created: 2026-04-29
 | R8 | Framework/content boundary | — | — |
 | R9 | Contributor workflow parity | — | — |
 | R10 | Deferred capture | A1 | T3.1–T3.32; T4.1–T4.2,T4.9–T4.12 |
-| R11 | Script and hook resilience | A3 | T1.3–T1.4,T1.8; T2.1,T2.4–T2.6,T2.9–T2.14,T2.17–T2.19,T2.21–T2.22,T2.24–T2.28,T2.32–T2.33,T2.38–T2.39; T3.7,T3.20,T3.25,T3.29–T3.30,T3.33–T3.39; T4.4–T4.8,T4.15; T5.10–T5.11,T5.16–T5.17,T5.21 |
+| R11 | Script and hook resilience | A3 | T1.3–T1.4,T1.8; T2.1,T2.4–T2.6,T2.9–T2.14,T2.17–T2.19,T2.21–T2.22,T2.24–T2.28,T2.32–T2.33,T2.38–T2.39; T3.7,T3.20,T3.25,T3.29–T3.30,T3.33–T3.39; T4.4–T4.8,T4.15; T5.10–T5.11,T5.16–T5.17,T5.21; T8.1–T8.4,T8.7,T8.9–T8.13 |
+| R12 | Optional infrastructure graceful degradation | A4 | T6.30–T6.34; T7.1–T7.5; T8.5,T8.6,T8.8 |
 
 ---
 
@@ -180,4 +181,21 @@ Every script and hook in `_scripts/` must exit 0 and not raise an unhandled exce
 - Generator scripts called by CI must handle empty or partial vault state without exiting non-zero
 - Missing input files must produce empty output, not a stack trace
 
-**Verified by:** T1.3–T1.4,T1.8; T2.1,T2.4–T2.6,T2.9–T2.14,T2.17–T2.19,T2.21–T2.22,T2.24–T2.28,T2.32–T2.33,T2.38–T2.39; T3.7,T3.20,T3.25,T3.29–T3.30,T3.33–T3.39; T4.4–T4.8,T4.15; T5.10–T5.11,T5.16–T5.17,T5.21
+**Verified by:** T1.3–T1.4,T1.8; T2.1,T2.4–T2.6,T2.9–T2.14,T2.17–T2.19,T2.21–T2.22,T2.24–T2.28,T2.32–T2.33,T2.38–T2.39; T3.7,T3.20,T3.25,T3.29–T3.30,T3.33–T3.39; T4.4–T4.8,T4.15; T5.10–T5.11,T5.16–T5.17,T5.21; T8.1–T8.4,T8.7,T8.9–T8.13
+
+---
+
+## R12 — Optional infrastructure graceful degradation
+
+Features that depend on optional infrastructure (Ollama, Qdrant, LiteLLM) must not crash or produce a Python traceback when that infrastructure is absent. Behavior is determined by configuration state:
+
+- **Not configured** (host env var empty or unset): exits 0 with a user-readable "not configured" message; no network call attempted
+- **Configured but unreachable** (URLError): exits with a user-readable "unavailable" message identifying the service; exit code matches caller context — 0 for interactive/slash-command scripts (so Claude can relay the message), 1 for CI/batch scripts (so the pipeline fails and alerts the operator)
+
+**Implications:**
+- Host env vars (`OLLAMA_HOST`, `QDRANT_HOST`) have no hardcoded fallback defaults — empty = not configured
+- Gitea Actions missing secrets evaluate to empty strings → triggers not-configured path, not a network timeout
+- Tier 1 and Tier 2/3 instances without RAG never produce red CI runs from unconfigured optional features
+- Partial failures (some chunks succeed, some fail) are acceptable degradation for batch operations — only total failure triggers a non-zero exit
+
+**Verified by:** T6.30–T6.34; T7.1–T7.5; T8.5,T8.6,T8.8

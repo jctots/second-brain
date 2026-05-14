@@ -32,3 +32,9 @@ jobs:
 
       - name: T6 — RAG embed
         run: python3 _tests/test_rag_embed.py
+
+      - name: T7 — RAG search
+        run: python3 _tests/test_rag_search.py
+
+      - name: T8 — Inject context RAG
+        run: python3 _tests/test_inject_context_rag.py

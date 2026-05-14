@@ -140,8 +140,8 @@ When project names are mentioned in the first message, `_scripts/inject-context.
 ## How to help me
 
 - When I share a note, help me place it in the right context and PARA category
-- `_self/about.md`, `_self/rules.md`, and project context files are auto-injected by hook on the first turn — no need to re-read them unless the hook missed something
-- **Do not write to workspace-scoped memory** (`~/.claude/projects/.../memory/`). All persistent memory for this vault lives in vault files: `_self/about.md` (profile + behavior), `_self/rules.md` (feedback rules), and project `_memory.md` files. Use `/remember` to persist anything worth keeping.
+- `_self/about.md`, `_self/corrections.md`, and project context files are auto-injected by hook on the first turn — no need to re-read them unless the hook missed something
+- **Do not write to workspace-scoped memory** (`~/.claude/projects/.../memory/`). All persistent memory for this vault lives in vault files: `_self/about.md` (profile + behavior), `_self/corrections.md` (corrections and known failure modes), and project `_memory.md` files. Use `/remember` to persist anything worth keeping.
 - If a project was mentioned but context files are missing, search `{personal,professional,public}/projects/{name}/` and read `CLAUDE.md` and `_memory.md` manually
 - When creating a new note or project file, check `_templates/` first for a relevant template
 - Prefer editing existing notes over creating new ones
@@ -154,10 +154,10 @@ Evaluate independently throughout the conversation. A single exchange may trigge
 
 Emit each marker on its own line immediately after the relevant response. Include a one-line description. Do not elaborate or branch the conversation.
 
-**🧠 `[memory event]`** — project state change, key decision, or anything worth persisting to project `_memory.md`.
+**🧠 `[memory event]`** — project state change, key decision, or anything worth persisting to project `_memory.md`. A key decision is any non-obvious choice where the why matters: rationale isn't self-evident, alternatives were weighed, or the trade-off has lasting consequences.
 Format: `🧠 [memory event]: one-line description`
 
-**👤 `[profile event]`** — profile fact or behavioral observation about the user. Profile facts → `_self/about.md`; behavioral corrections or feedback rules → `_self/rules.md`. Handled by `/remember` inline and `/maintain` option 2 backstop.
+**👤 `[profile event]`** — profile fact or behavioral observation about the user. Profile facts → `_self/about.md`; behavioral corrections or feedback rules → `_self/corrections.md`; pure self-awareness observations (no Claude action) → `_self/reflection.md`. Handled by `/remember` inline and `/maintain` option 2 backstop.
 Format: `👤 [profile event]: one-line description`
 
 **🗂️ `[distill event]`** — lasting reference value beyond this project: technology analysis, tool comparisons, design patterns, architectural concepts, mental models. Does not trigger for project-specific decisions or ephemeral details.
@@ -165,6 +165,9 @@ Format: `🗂️ [distill event]: one-line description`
 
 **✅ `[task event]`** — concrete next action identified for the user. Visual signal only — not routed by `/remember`; use judgment to include task-relevant content in the `_memory.md` block.
 Format: `✅ [task event]: one-line description`
+
+**📖 `[retrieve: path]`** — vault note flagged as relevant and worth reading in full. Emit when a title surfaced by the RAG hook seems directly useful to the current task. If the user confirms, read the file directly using your tools. Visual signal only — not routed by `/remember`.
+Format: `📖 [retrieve: path/to/note.md]`
 
 These markers are scanned by `save-conversation.py` and written to the conversation frontmatter as `events: [memory, profile, distill, task]`. `/remember` makes a judgment pass over the current conversation — markers are signals, not the authoritative source. Missed conversations are caught by `/maintain` via `_conversations/pending-events.md` (CI-generated).
 
@@ -184,4 +187,4 @@ These markers are scanned by `save-conversation.py` and written to the conversat
 
 ## Hook injection budget
 
-Each injected file (`_self/about.md`, `_self/rules.md`, project `CLAUDE.md`, project `_memory.md`) has a 10,000-char hard limit; warn at 8,000 (80%); consolidation target is 5,000 chars. `/remember` appends — never edits sections in-place. `/maintain` option 4 absorbs appended blocks into proper sections and consolidates to within budget.
+Each injected file (`_self/about.md`, `_self/corrections.md`, project `CLAUDE.md`, project `_memory.md`) has a 10,000-char hard limit; warn at 8,000 (80%); consolidation target is 5,000 chars. `/remember` appends — never edits sections in-place. `/maintain` option 4 absorbs appended blocks into proper sections and consolidates to within budget.

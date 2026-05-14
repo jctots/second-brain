@@ -7,11 +7,13 @@ Scenarios are identified as **T#.#** — first number is the test file, second i
 | T# | File | Covers |
 |---|---|---|
 | T1 | `test_hook_budget.py` | Hook injection budget enforcement |
-| T2 | `test_inject_hooks.py` | `inject-profile.py`, `inject-rules.py`, `inject-context-claude.py`, `inject-context-memory.py` |
+| T2 | `test_inject_hooks.py` | `inject-profile.py`, `inject-corrections.py`, `inject-context-claude.py`, `inject-context-memory.py` |
 | T3 | `test_save_conversation.py` | `save-conversation.py` |
 | T4 | `test_generate_pending_events.py` | `generate-pending-events.py` |
 | T5 | `test_generate_dashboard.py` | `generate-dashboard.py` |
-| T6 | `test_rag_embed.py` | `rag-embed.py` — point ID stability, skip logic, chunking contracts |
+| T6 | `test_rag_embed.py` | `rag-embed.py` — point ID stability, skip logic, chunking contracts, graceful degradation |
+| T7 | `test_rag_search.py` | `rag-search.py` — graceful degradation (not configured, services down, happy path) |
+| T8 | `test_inject_context_rag.py` | `inject-context-rag.py` — H1 extraction (frontmatter state machine, stem fallback), graceful degradation, threshold filtering, deduplication, output format |
 
 Fixtures are created in `tempfile.TemporaryDirectory` per test and cleaned up after. Smoke tests run against the real vault (Gitea CI — full content available).
 
@@ -19,16 +21,16 @@ Fixtures are created in `tempfile.TemporaryDirectory` per test and cleaned up af
 
 ## T1 — `test_hook_budget.py`
 
-This is a health check script, not a unit test file. It runs against the real vault — no isolated fixtures. When CI executes it, it reads the actual `_self/about.md`, `_self/rules.md`, and each active project's `CLAUDE.md` and `_memory.md`, and fails if any exceed 10,000 chars.
+This is a health check script, not a unit test file. It runs against the real vault — no isolated fixtures. When CI executes it, it reads the actual `_self/about.md`, `_self/corrections.md`, and each active project's `CLAUDE.md` and `_memory.md`, and fails if any exceed 10,000 chars.
 
 ### `main()` — real vault health check
 
 | # | Scenario | Expected | Req |
 |---|---|---|---|
 | T1.1 | `_self/about.md` exists and within limit | Checked and reported as `OK` | R6 |
-| T1.2 | `_self/rules.md` exists and within limit | Checked and reported as `OK` | R6 |
+| T1.2 | `_self/corrections.md` exists and within limit | Checked and reported as `OK` | R6 |
 | T1.3 | `_self/about.md` is missing | Reported as `FAIL`, added to failures, exit 1 | R6, R11 |
-| T1.4 | `_self/rules.md` is missing | Reported as `FAIL`, added to failures, exit 1 | R6, R11 |
+| T1.4 | `_self/corrections.md` is missing | Reported as `FAIL`, added to failures, exit 1 | R6, R11 |
 | T1.5 | Project `CLAUDE.md` exists and within limit | Checked and reported as `OK` | R6 |
 | T1.6 | Project `_memory.md` exists and within limit | Checked and reported as `OK` | R6 |
 | T1.7 | Project filter arg provided (e.g. `personal/projects/my-project`) | Only matching project checked, others skipped | R6 |
@@ -49,12 +51,12 @@ This is a health check script, not a unit test file. It runs against the real va
 | T2.5 | Transcript file has lines with malformed JSON | Skips bad lines, continues scanning | R11 |
 | T2.6 | Transcript file has blank lines interspersed | Skips blank lines, continues scanning | R11 |
 
-### `inject-profile.py` / `inject-rules.py` — `main()`
+### `inject-profile.py` / `inject-corrections.py` — `main()`
 
 | # | Scenario | Expected | Req |
 |---|---|---|---|
 | T2.7 | `_self/about.md` exists, first turn | Outputs content with correct label prefix, exits 0 | R6 |
-| T2.8 | `_self/rules.md` exists, first turn | Outputs content with correct label prefix, exits 0 | R6 |
+| T2.8 | `_self/corrections.md` exists, first turn | Outputs content with correct label prefix, exits 0 | R6 |
 | T2.9 | stdin is empty string | Exits 0, no output | R11 |
 | T2.10 | stdin is invalid JSON | Exits 0, no output | R11 |
 | T2.11 | Hook data has no `transcript_path` key | Injects unconditionally (no turn check), exits 0 | R11 |
@@ -305,6 +307,73 @@ This is a health check script, not a unit test file. It runs against the real va
 | T6.20 | Heading is `__preamble__` | No `## ` prefix in chunk text |
 | T6.21 | Normal heading | Chunk text prefixed with `## {heading}\n\n` |
 
+### `main()` — graceful degradation
+
+`ensure_collection` and `ollama_embed` are mocked; file I/O uses a `TemporaryDirectory` vault for T6.33–T6.34. `_embed.__file__` is temporarily redirected so `root = Path(__file__).parent.parent` resolves to the temp vault.
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T6.30 | `OLLAMA_HOST` empty | Prints "not configured", returns; `ensure_collection` never called | R12 |
+| T6.31 | `QDRANT_HOST` empty | Prints "not configured", returns; `ensure_collection` never called | R12 |
+| T6.32 | `ensure_collection` raises `RuntimeError` (Qdrant down) | Prints error to stderr, exits 1 | R12 |
+| T6.33 | All `ollama_embed` calls raise `URLError` (Ollama down, Qdrant up) | `embed_failures > 0`, `total_chunks == 0` → exits 1 | R12 |
+| T6.34 | First embed succeeds, second raises `URLError` | `total_chunks > 0` → exits 0; warning printed per failed chunk | R12 |
+
+---
+
+## T7 — `test_rag_search.py`
+
+### `main()` — graceful degradation
+
+`ollama_embed` and `qdrant_search` are mocked; env vars controlled via `patch.dict`. All paths return cleanly (exit 0) — callers (`/search`, `/maintain` option 5) receive a readable message rather than a traceback.
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T7.1 | `OLLAMA_HOST` empty | Prints "not configured", returns; `ollama_embed` never called | R12 |
+| T7.2 | `QDRANT_HOST` empty | Prints "not configured", returns; `ollama_embed` never called | R12 |
+| T7.3 | `ollama_embed` raises `URLError` | Prints "Ollama unreachable: ...", returns cleanly | R12 |
+| T7.4 | `qdrant_search` raises `URLError` | Prints "Qdrant unreachable: ...", returns cleanly | R12 |
+| T7.5 | Both services up (mocked) | Results printed to stdout; file path appears in output | R12 |
+
+---
+
+## T8 — `test_inject_context_rag.py`
+
+`ollama_embed` and `qdrant_search` are mocked; env vars controlled via `patch.dict`; a `TemporaryDirectory` provides `cwd` with stub vault files.
+
+### `extract_h1(path)`
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T8.1 | File has H1 after YAML frontmatter | Returns heading text — frontmatter state machine skips the block correctly | R11 |
+| T8.2 | H1 line appears inside the frontmatter block | Not returned — `in_frontmatter` flag suppresses it; stem returned instead | R11 |
+| T8.3 | File has no H1 within first 30 lines | Returns `path.stem` — early-exit guard triggers | R11 |
+| T8.4 | File does not exist or has encoding error | Returns `path.stem` — `OSError`/`UnicodeDecodeError` caught silently | R11 |
+
+### `main()` — graceful degradation
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T8.5 | `OLLAMA_HOST` not set | Exits 0, no output; `ollama_embed` never called | R12 |
+| T8.6 | `QDRANT_HOST` not set | Exits 0, no output; `ollama_embed` never called | R12 |
+| T8.7 | `prompt` field is empty or whitespace | Exits 0, no output | R12 |
+| T8.8 | `ollama_embed` or `qdrant_search` raises `URLError` | Exits 0, no output | R12 |
+
+### `main()` — filtering and deduplication
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T8.9 | Qdrant returns empty result list | Exits 0, no output — `seen` stays empty, no crash | R11 |
+| T8.10 | All results below `SCORE_THRESHOLD` (0.55) | Exits 0, no output | R11 |
+| T8.11 | Same `file_path` in two hits with scores 0.60 then 0.65 | Entry updated to 0.65 — `score > seen[fp]` branch exercised; highest score kept | R11 |
+| T8.12 | Four distinct files above threshold | Only top 3 in output, ordered by score descending — `MAX_FILES` limit enforced | R11 |
+
+### `main()` — output format
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T8.13 | Two results above threshold with known files | Output is exactly `## Relevant vault notes\n- {path} — {title}` per result; em dash and spacing correct; highest-score file first | R11 |
+
 ---
 
 ## Smoke tests (all scripts)
@@ -312,11 +381,15 @@ This is a health check script, not a unit test file. It runs against the real va
 | Script | Smoke assertion | Req |
 |---|---|---|
 | `inject-profile.py` | Exits 0; output contains `_self/about.md` content | R6, R11 |
-| `inject-rules.py` | Exits 0; output contains `_self/rules.md` content | R6, R11 |
+| `inject-corrections.py` | Exits 0; output contains `_self/corrections.md` content | R6, R11 |
 | `inject-context-claude.py` | Exits 0 with a known project name in prompt | R11 |
 | `inject-context-memory.py` | Exits 0 with a known project name in prompt | R11 |
 | `save-conversation.py` | Exits 0 when given a valid transcript path | R10, R11 |
 | `generate-pending-events.py` | Exits 0; `_conversations/pending-events.md` written | R7, R10, R11 |
 | `generate-dashboard.py` | Exits 0; `dashboard.md` written | R7, R11 |
 | `rag-embed.py` (no args) | Exits 0; Qdrant `second_brain` collection exists, chunk count > 0 — requires live Qdrant + Ollama (configure via `.env`) | R5 |
+| `rag-embed.py` (no `.env`, no env vars) | Exits 0; prints "RAG not configured" — no network calls | R5 |
 | `rag-search.py` | Exits 0 with a known query; at least one result printed — requires live Qdrant + Ollama (configure via `.env`) | R5 |
+| `rag-search.py` (no `.env`, no env vars) | Exits 0; prints "RAG not configured" — no network calls | R5 |
+| `inject-context-rag.py` (live services, `.env` configured) | Exits 0 with a real prompt; if results exist, output starts with `## Relevant vault notes` | R12 |
+| `inject-context-rag.py` (no `.env`, no env vars) | Exits 0; no output — not configured path | R12 |

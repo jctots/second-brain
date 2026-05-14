@@ -102,11 +102,11 @@ Create `_self/about.md`. This file is where the AI will maintain a profile and b
 
 ## Profile
 
-_AI-maintained. Updated via /sync-memory._
+_AI-maintained. Updated via /remember._
 
 ## Reflection
 
-_AI-maintained. Updated via /sync-memory._
+_AI-maintained. Updated via /remember._
 ```
 
 
