@@ -23,12 +23,12 @@ created: 2026-04-29
 | R3 | Reproducibility | — | — |
 | R4 | Privacy / data sovereignty | — | — |
 | R5 | No always-on processes | A2 | — |
-| R6 | Hook injection budget | — | T1.1–T1.12; T2.7–T2.8 |
+| R6 | Hook injection budget | — | T1.1–T1.8; T2.7–T2.8 |
 | R7 | Generated artifacts are static | A2 | T4.3,T4.13–T4.17; T5.1–T5.22 |
 | R8 | Framework/content boundary | — | — |
 | R9 | Contributor workflow parity | — | — |
-| R10 | Deferred capture | A1 | T3.1–T3.33; T4.1–T4.2,T4.9–T4.12 |
-| R11 | Script and hook resilience | A3 | T1.7–T1.8,T1.12; T2.1,T2.4–T2.6,T2.9–T2.14,T2.17–T2.19,T2.21–T2.22,T2.24–T2.28,T2.32–T2.33,T2.38–T2.39; T3.7,T3.20,T3.25,T3.29–T3.30,T3.34–T3.40; T4.4–T4.8,T4.15; T5.10–T5.11,T5.16–T5.17,T5.21 |
+| R10 | Deferred capture | A1 | T3.1–T3.32; T4.1–T4.2,T4.9–T4.12 |
+| R11 | Script and hook resilience | A3 | T1.3–T1.4,T1.8; T2.1,T2.4–T2.6,T2.9–T2.14,T2.17–T2.19,T2.21–T2.22,T2.24–T2.28,T2.32–T2.33,T2.38–T2.39; T3.7,T3.20,T3.25,T3.29–T3.30,T3.33–T3.39; T4.4–T4.8,T4.15; T5.10–T5.11,T5.16–T5.17,T5.21 |
 
 ---
 
@@ -112,7 +112,7 @@ Claude Code caps each hook command's output independently at ~10,000 characters;
 - `/maintain` option 4 consolidates files at the warning threshold, targeting 5,000 chars
 - Aging content routes to `decisions/`, `resources/`, or is dropped — not preserved in an extended section
 
-**Verified by:** T1.1–T1.12; T2.7–T2.8
+**Verified by:** T1.1–T1.8; T2.7–T2.8
 
 ---
 
@@ -162,7 +162,7 @@ The system must support capture without requiring immediate processing. During a
 - Deferred capture keeps sessions focused — markers are emitted without branching the current task
 - `/maintain` option 2 serves as the backstop for sessions where `/remember` or `/distill` was not run
 
-**Verified by:** T3.1–T3.33; T4.1–T4.2,T4.9–T4.12
+**Verified by:** T3.1–T3.32; T4.1–T4.2,T4.9–T4.12
 
 ---
 
@@ -180,4 +180,4 @@ Every script and hook in `_scripts/` must exit 0 and not raise an unhandled exce
 - Generator scripts called by CI must handle empty or partial vault state without exiting non-zero
 - Missing input files must produce empty output, not a stack trace
 
-**Verified by:** T1.7–T1.8,T1.12; T2.1,T2.4–T2.6,T2.9–T2.14,T2.17–T2.19,T2.21–T2.22,T2.24–T2.28,T2.32–T2.33,T2.38–T2.39; T3.7,T3.20,T3.25,T3.29–T3.30,T3.34–T3.40; T4.4–T4.8,T4.15; T5.10–T5.11,T5.16–T5.17,T5.21
+**Verified by:** T1.3–T1.4,T1.8; T2.1,T2.4–T2.6,T2.9–T2.14,T2.17–T2.19,T2.21–T2.22,T2.24–T2.28,T2.32–T2.33,T2.38–T2.39; T3.7,T3.20,T3.25,T3.29–T3.30,T3.33–T3.39; T4.4–T4.8,T4.15; T5.10–T5.11,T5.16–T5.17,T5.21

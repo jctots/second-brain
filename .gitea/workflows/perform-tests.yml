@@ -12,7 +12,8 @@ jobs:
     steps:
       - name: Checkout
         run: |
-          git clone https://oauth2:${{ secrets.GITEA_TOKEN }}@git.3etn.net/${{ gitea.repository }}.git .
+          SERVER=$(echo "${{ gitea.server_url }}" | sed 's|^https://||')
+          git clone "https://oauth2:${{ secrets.GITEA_TOKEN }}@${SERVER}/${{ gitea.repository }}.git" .
 
       - name: T1 — Hook injection budget
         run: python3 _tests/test_hook_budget.py
@@ -28,3 +29,6 @@ jobs:
 
       - name: T5 — Generate dashboard
         run: python3 _tests/test_generate_dashboard.py
+
+      - name: T6 — RAG embed
+        run: python3 _tests/test_rag_embed.py

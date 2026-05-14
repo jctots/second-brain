@@ -1,0 +1,45 @@
+name: RAG embed vault
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.md'
+  workflow_dispatch:
+    inputs:
+      full_reindex:
+        description: 'Full vault re-index (ignore changed files)'
+        required: false
+        default: 'false'
+
+jobs:
+  embed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        run: |
+          SERVER=$(echo "${{ gitea.server_url }}" | sed 's|^https://||')
+          git clone "https://oauth2:${{ secrets.GITEA_TOKEN }}@${SERVER}/${{ gitea.repository }}.git" .
+
+      - name: Embed changed / remove deleted
+        run: |
+          if [ "${{ gitea.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual trigger — full vault re-index."
+            python3 _scripts/rag-embed.py
+          elif git rev-parse HEAD~1 >/dev/null 2>&1; then
+            CHANGED=$(git diff --name-only --diff-filter=ACM HEAD~1 HEAD -- '*.md' | tr '\n' ' ')
+            DELETED=$(git diff --name-only --diff-filter=D HEAD~1 HEAD -- '*.md' | tr '\n' ' ')
+            echo "Changed: $CHANGED"
+            echo "Deleted: $DELETED"
+            [ -z "$CHANGED" ] && [ -z "$DELETED" ] && echo "Nothing to do." && exit 0
+            ARGS=""
+            [ -n "$CHANGED" ] && ARGS="--files $CHANGED"
+            [ -n "$DELETED" ] && ARGS="$ARGS --deleted $DELETED"
+            python3 _scripts/rag-embed.py $ARGS
+          else
+            echo "Initial commit — full vault re-index."
+            python3 _scripts/rag-embed.py
+          fi
+        env:
+          OLLAMA_HOST: ${{ secrets.OLLAMA_HOST }}
+          QDRANT_HOST: ${{ secrets.QDRANT_HOST }}

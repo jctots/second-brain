@@ -185,7 +185,6 @@ Python scripts callable both from Claude Code hooks and Gitea Actions CI. No ext
 | `generate-pdf-sidecars.py` | CI (`generate-artifacts.yml`) | Generate Markdown sidecars for PDFs — text-layer via pdfplumber; image PDFs via tesseract OCR (external deps: pdfplumber, pypdfium2, pytesseract; installed via CI venv) |
 | `embed-vault.py` | CI (`embed-vault.yml`), manual | Walk vault, chunk by heading (H2/H3), embed via Ollama (`embeddinggemma:latest`), upsert into Qdrant with metadata (path, para, context, project, tags) |
 | `search-vault.py` | `/search` slash command | Embed query string, query Qdrant, return top-5 ranked results (score · path · heading · snippet) |
-| `commit.py` | `/sync` (commit option) | Stage → commit → pull rebase → push |
 
 ---
 
@@ -731,7 +730,18 @@ All instances use the same git workflow. The only mechanical difference is that 
 
 The upstream improves from any contributor's workflow — no special publishing step, no stale snapshots.
 
-By convention: `origin` = your private git host (Gitea or GitHub fork); `upstream` = the public GitHub framework repo.
+#### Git remotes and branches
+
+| Name | Tier 1 | Tier 2/3 | Used by |
+|---|---|---|---|
+| `origin` | GitHub fork | Private Gitea | All `/sync` options |
+| `upstream` | — (origin IS the fork) | Public GitHub framework repo | `/sync check`, `/sync update`, `/contribute` |
+| `origin/main` | Primary branch | Primary branch | All `/sync` options |
+| `origin/mobile` | — (not applicable) | Phone branch — Obsidian mobile backups | `/sync mobile`, `/sync commit` |
+
+On Tier 2/3, `origin` is configured to push `main` to both `origin/main` and `origin/mobile` via `remote.origin.push` refspecs, so `git push origin` always keeps both in sync. `/sync` commands depend on these conventions — do not rename the remotes or branches without updating the command instructions.
+
+By convention:
 
 ```
 # pull improvements

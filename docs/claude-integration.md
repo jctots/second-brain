@@ -6,31 +6,21 @@ Claude Code is the AI interface at every deployment tier. For Tier 2/3 (private 
 
 > For Tier 1 (Anthropic API): session context is sent to Anthropic's servers. Read [PRIVACY.md](../PRIVACY.md) before using Claude Code with sensitive content.
 
-
 ## 🪝 Hook architecture
 
 Claude Code supports hooks that execute shell commands at specific lifecycle events. This system uses `UserPromptSubmit` (before Claude processes a message) and `Stop`/`SessionEnd` (after Claude responds, for conversation saving).
 
-Four hooks fire on the first message of every conversation — each as a separate `.claude/settings.json` entry so each gets its own independent injection budget:
-
-| Hook | Injects | Tier |
-|---|---|---|
-| `inject-profile.py` | `_self/about.md` — your profile and behavioral reflection | All |
-| `inject-rules.py` | `_self/rules.md` — feedback and corrections that persist across sessions | All |
-| `inject-context-claude.py` | Detected project's `CLAUDE.md` — matched from project name in your first message | Tier 1 |
-| `inject-context-memory.py` | Detected project's `_memory.md` — current state, open questions, key decisions | Tier 1 |
-| `inject-context-project.py` | Same as above but detected via Qdrant embedding; falls back to keyword match | Tier 2/3 |
-
-Two additional hooks fire on every turn (Tier 2/3 only):
-
-| Hook | Injects | Tier |
-|---|---|---|
-| `inject-context-rag.py` | Relevant note titles (Qdrant top-3); full content for 📖 markers from previous turn | Tier 2/3 |
-
-`save-conversation.py` runs on `Stop`/`SessionEnd` — saves the session transcript to `_conversations/YYYY/MM/` with YAML frontmatter including event markers.
+| Hook                        | Event           | Injects                                                                                     | Tier     |
+| --------------------------- | --------------- | ------------------------------------------------------------------------------------------- | -------- |
+| `inject-profile.py`         | First message   | `_self/about.md` — your profile and behavioral reflection                                   | All      |
+| `inject-rules.py`           | First message   | `_self/rules.md` — feedback and corrections that persist across sessions                    | All      |
+| `inject-context-claude.py`  | First message   | Detected project's `CLAUDE.md` — matched from project name in your first message            | Tier 1   |
+| `inject-context-memory.py`  | First message   | Detected project's `_memory.md` — current state, open questions, key decisions              | Tier 1   |
+| `inject-context-project.py` | First message   | Same as above but detected via Qdrant embedding; falls back to keyword match                | Tier 2/3 |
+| `inject-context-rag.py`     | Every turn      | Relevant note titles (Qdrant top-3); full content for 📖 markers from previous turn         | Tier 2/3 |
+| `save-conversation.py`      | Stop/SessionEnd | Saves transcript to `_conversations/YYYY/MM/` with YAML frontmatter including event markers | All      |
 
 For component interfaces and data flows, see [second-brain-setup/architecture.md — Claude Code interface](../personal/projects/second-brain-setup/architecture.md#claude-code-interface).
-
 
 ## 💰 Context injection budget
 
@@ -38,10 +28,10 @@ Claude Code caps all hook output at **10,000 characters per hook**. Content beyo
 
 The budget for this system:
 
-| Hook | Script | Warn at | Hard limit |
-|---|---|---|---|
-| `UserPromptSubmit` #1 | `inject-profile.py` | 8,000 chars | 10,000 chars |
-| `UserPromptSubmit` #2 | `inject-rules.py` | 8,000 chars | 10,000 chars |
+| Hook                  | Script                     | Warn at     | Hard limit   |
+| --------------------- | -------------------------- | ----------- | ------------ |
+| `UserPromptSubmit` #1 | `inject-profile.py`        | 8,000 chars | 10,000 chars |
+| `UserPromptSubmit` #2 | `inject-rules.py`          | 8,000 chars | 10,000 chars |
 | `UserPromptSubmit` #3 | `inject-context-claude.py` | 8,000 chars | 10,000 chars |
 | `UserPromptSubmit` #4 | `inject-context-memory.py` | 8,000 chars | 10,000 chars |
 
@@ -58,10 +48,9 @@ The warn threshold (80%) is enforced in two places:
 
 At the start of every conversation, Claude should announce which files were loaded:
 
-> *"Loaded: `personal/projects/my-project/CLAUDE.md` + `_memory.md`"*
+> _"Loaded: `personal/projects/my-project/CLAUDE.md` + `_memory.md`"_
 
 No announcement = hook miss. This is the passive health check — you don't have to ask, and silence is observable.
-
 
 ## ⚡ Slash commands
 
@@ -72,6 +61,7 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 **Purpose:** Initialize a new vault entry — project, area, or resource.
 
 **How it works:**
+
 1. Asks three open questions in one message: your goal, your inputs (links, docs, a brief), and any other relevant context
 2. Proposes a classification: PARA category (`projects`, `areas`, or `resources`), context (`personal`, `professional`, or `public`), a kebab-case slug, and a one-line description
 3. Waits for your confirmation or adjustment before writing anything
@@ -82,13 +72,14 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 
 ### /remember
 
-**Purpose:** End-of-session processing — act on 🧠 memory and ✅ task markers emitted during the conversation.
+**Purpose:** End-of-session processing — persist what's worth keeping from the current conversation to project and profile files.
 
 **How it works:**
-1. Scans the current conversation for 🧠 markers → routes each to the correct target file (`_memory.md`, `decisions/`, `_self/about.md`, `_self/rules.md`)
-2. Scans for ✅ markers → routes tasks to the project's `roadmap.md` or next-actions section
-3. Writes updates using Edit (never Write)
-4. Emits `🔁 [remember processed]` and `📋 [task processed]` markers, saved to conversation frontmatter
+
+1. Makes a judgment pass over the full conversation — markers are signals, not the authoritative source
+2. Updates `## Quick status` in-place if project state changed materially
+3. Appends a `<!-- remembered: YYYY-MM-DD -->` block to each target file using Edit (never Write)
+4. Emits processed markers for what was actually written: `🔁 [remember processed]` (`_memory.md`), `🪪 [profile processed]` (`_self/`), `📋 [task processed]` (tasks)
 
 **When to run:** At the end of any session with significant decisions or state changes.
 
@@ -107,6 +98,7 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 **Purpose:** Vault operations — seven options covering the full vault health cycle.
 
 **What it covers:**
+
 - **Generate artifacts** — run all scripts locally, same as CI: `generate-conversation-index.py`, `generate-project-indices.py`, `generate-dashboard.py`, `generate-pending-events.py`
 - **Inbox processing** — route `_inbox/` items to the right PARA location; flag distill candidates
 - **Event processing** — surface and process missed events from past conversations via `_conversations/pending-events.md`
@@ -117,11 +109,11 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 
 ### /sync
 
-**Purpose:** Git operations — commit staged work, check or pull framework updates.
+**Purpose:** Git operations — sync phone changes, commit desktop work, check or pull framework updates.
 
-**How it works:** Claude reads `git diff --cached`, proposes a commit message, you confirm or edit, then Claude calls `python _scripts/commit.py "message"` which handles `git pull --rebase` → `git commit` → `git push`.
+**Options:** `mobile` (merge origin/mobile → main, push both remotes), `commit` (mobile first, then commit staged changes, push both remotes), `check` (show available framework updates), `update` (merge framework updates).
 
-**Why split:** Message drafting requires judgment. Git mechanics are deterministic. Keeping Claude in-conversation avoids spawning a cold-context agent to run shell commands.
+**How it works:** Claude runs git commands directly — fetch, merge, diff, commit, push. Before any merge or commit, unstaged changes in CI-generated files (`_conversations/`, project `index.md` files) are discarded automatically. Commit message drafting requires judgment; git mechanics are deterministic.
 
 ### /contribute
 
@@ -134,18 +126,13 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 **Purpose:** Query your vault by meaning (Tier 2/3) or keyword (Tier 1).
 
 **How it works:**
+
 - **Tier 2/3 (semantic):** Embeds the query via Ollama, searches Qdrant, returns top results ranked by similarity — file path, heading, and a short snippet per result
 - **Tier 1 (keyword):** Falls back to ripgrep across all vault `.md` files
 
 **When to run:** Any time you want to surface related notes. Passive surfacing (hook-based) injects relevant note titles automatically each turn — `/search` is the active, on-demand complement. When Claude sees a title worth reading in full, it emits a `📖 [retrieve: path]` marker; the hook loads the full note on the next turn.
 
 **Requires:** Qdrant running and vault indexed (`python _scripts/embed-vault.py`) for semantic mode. Keyword mode has no additional requirements.
-
-
-## ⚖️ The judgment / automation line
-
-If a step requires no judgment, it's a script. If it does, it's Claude. See [second-brain-setup/architecture.md — Boundaries and ownership](../personal/projects/second-brain-setup/architecture.md#boundaries-and-ownership) for the full breakdown.
-
 
 ## 🌱 How `_self/` files grow
 
@@ -158,7 +145,6 @@ If a step requires no judgment, it's a script. If it does, it's Claude. See [sec
 
 The goal for both: the injected summary stays bounded and useful while remaining within the hook injection budget.
 
-
 ## 🔍 Project detection
 
 **Tier 1 (keyword):** `inject-context-claude.py` and `inject-context-memory.py` detect the current project by scanning the first user message for words that match folder names under `{personal,professional,public}/projects/`. The algorithm:
@@ -169,10 +155,11 @@ The goal for both: the injected summary stays bounded and useful while remaining
 
 **Tier 2/3 (semantic):** `inject-context-project.py` replaces the pair above. It embeds the first message via Ollama, queries Qdrant against project-indexed embeddings, and injects the matching project's `CLAUDE.md` + `_memory.md`. Falls back to keyword match when Qdrant is unreachable.
 
-**Fallback:** If a project was mentioned but the hook missed it (typo, new project not yet created), the root `CLAUDE.md` instructs Claude to search manually and read the files.
+**Fallback (automated):** If no project is matched from the message, the hook reads the transcript for the most recently opened IDE file and infers the project from its path.
+
+**Fallback (manual):** If the hook missed entirely (typo, new project not yet created), the root `CLAUDE.md` instructs Claude to search manually and read the files.
 
 **Multi-project sessions:** Mention all relevant projects in the first message — the hook matches all of them.
-
 
 ## 🔒 Privacy and inference tiers
 
