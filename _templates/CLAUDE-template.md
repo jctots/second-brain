@@ -31,9 +31,9 @@ Optional files — create when the signal appears, not before:
 - `roadmap.md` — when next-actions or a backlog outgrows `index.md` or `_memory.md`. Good candidate for a scheduled agent.
 - `requirements.md` + `architecture.md` — only if `reference.md` grows distinct "constraints" and "structure" sections consulted separately. Most projects never reach this.
 
-## On sync memory
+## On /remember
 
-When sync memory runs and this project is involved:
+When `/remember` runs and this project is involved:
 
 1. Update `_memory.md` — update existing sections in-place. Do not append new blocks.
 2. If a significant decision was made: create `decisions/D{n}-{slug}.md` if `decisions/` exists, otherwise record it in `_memory.md` under Key decisions.

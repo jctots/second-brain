@@ -13,10 +13,10 @@ Claude Code supports hooks that execute shell commands at specific lifecycle eve
 | Hook                        | Event           | Injects                                                                                     | Tier     |
 | --------------------------- | --------------- | ------------------------------------------------------------------------------------------- | -------- |
 | `inject-profile.py`         | First message   | `_self/about.md` — your profile and behavioral reflection                                   | All      |
-| `inject-rules.py`           | First message   | `_self/rules.md` — feedback and corrections that persist across sessions                    | All      |
+| `inject-corrections.py`     | First message   | `_self/corrections.md` — corrections and known failure modes that persist across sessions   | All      |
 | `inject-context-claude.py`  | First message   | Detected project's `CLAUDE.md` — matched from project name in your first message            | Tier 1   |
 | `inject-context-memory.py`  | First message   | Detected project's `_memory.md` — current state, open questions, key decisions              | Tier 1   |
-| `inject-context-project.py` | First message   | Same as above but detected via Qdrant embedding; falls back to keyword match                | Tier 2/3 |
+| `inject-context-project.py` *(planned)* | First message   | Same as above but detected via Qdrant embedding; falls back to keyword match                | Tier 2/3 |
 | `inject-context-rag.py`     | Every turn      | Relevant note titles (Qdrant top-3); full content for 📖 markers from previous turn         | Tier 2/3 |
 | `save-conversation.py`      | Stop/SessionEnd | Saves transcript to `_conversations/YYYY/MM/` with YAML frontmatter including event markers | All      |
 
@@ -31,7 +31,7 @@ The budget for this system:
 | Hook                  | Script                     | Warn at     | Hard limit   |
 | --------------------- | -------------------------- | ----------- | ------------ |
 | `UserPromptSubmit` #1 | `inject-profile.py`        | 8,000 chars | 10,000 chars |
-| `UserPromptSubmit` #2 | `inject-rules.py`          | 8,000 chars | 10,000 chars |
+| `UserPromptSubmit` #2 | `inject-corrections.py`    | 8,000 chars | 10,000 chars |
 | `UserPromptSubmit` #3 | `inject-context-claude.py` | 8,000 chars | 10,000 chars |
 | `UserPromptSubmit` #4 | `inject-context-memory.py` | 8,000 chars | 10,000 chars |
 
@@ -123,16 +123,15 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 
 ### /search
 
-**Purpose:** Query your vault by meaning (Tier 2/3) or keyword (Tier 1).
+**Purpose:** Query your vault by semantic similarity (Tier 2/3 only).
 
 **How it works:**
 
-- **Tier 2/3 (semantic):** Embeds the query via Ollama, searches Qdrant, returns top results ranked by similarity — file path, heading, and a short snippet per result
-- **Tier 1 (keyword):** Falls back to ripgrep across all vault `.md` files
+Embeds the query via Ollama, searches Qdrant, returns top results ranked by similarity — file path, heading, and a short snippet per result. Prints "RAG not configured" or "RAG unavailable" if services are absent — no Tier 1 fallback.
 
 **When to run:** Any time you want to surface related notes. Passive surfacing (hook-based) injects relevant note titles automatically each turn — `/search` is the active, on-demand complement. When Claude sees a title worth reading in full, it emits a `📖 [retrieve: path]` marker; the hook loads the full note on the next turn.
 
-**Requires:** Qdrant running and vault indexed (`python _scripts/embed-vault.py`) for semantic mode. Keyword mode has no additional requirements.
+**Requires:** Qdrant running and vault indexed (`python _scripts/rag-embed.py`). `OLLAMA_HOST` and `QDRANT_HOST` must be set in `.env`.
 
 ## 🌱 How `_self/` files grow
 
@@ -141,7 +140,7 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 - New behavioral observations are **merged into existing bullets** rather than appended (if a bullet already covers the observation, it's updated in place)
 - When the `## Reflection` section exceeds ~20 bullets, `/remember` re-clusters them into labeled sub-groups
 
-**`_self/rules.md`** — grows from corrections and confirmed preferences, not observations. Claude saves a rule when you correct an approach ("don't do X") or explicitly confirm a non-obvious one ("yes, keep doing that"). Each rule includes a `Why:` and `How to apply:` line so edge cases can be reasoned about, not just followed blindly. Rules are never appended automatically — they require an explicit signal from you.
+**`_self/corrections.md`** — grows from corrections, confirmed preferences, and known failure modes. Claude saves an entry when you correct an approach ("don't do X") or explicitly confirm a non-obvious one ("yes, keep doing that"). Recurring failures (AI or user) are captured in the `## Known failure modes` section with root cause and prevention. Entries are never appended automatically — they require an explicit signal from you.
 
 The goal for both: the injected summary stays bounded and useful while remaining within the hook injection budget.
 

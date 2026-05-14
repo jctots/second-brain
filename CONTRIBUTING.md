@@ -110,4 +110,4 @@ For significant changes, open an issue first to discuss before putting in the wo
 - A product with a support SLA
 - Seeking feature parity with Obsidian, Notion, or similar tools
 
-See the [comparison](README.md#️-how-this-compares) and [evolution](docs/evolution.md) for where this project is and isn't going.
+See the [comparison](README.md#️-how-this-compares) and [limitations and roadmap](docs/limitations-and-roadmap.md) for where this project is and isn't going.

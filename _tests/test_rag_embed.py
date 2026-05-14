@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """T6 — Tests for rag-embed.py"""
 import importlib.util
+import os
+import sys
+import tempfile
 import unittest
+import urllib.error
+from io import StringIO
 from pathlib import Path
+from unittest.mock import patch, MagicMock
 
 SCRIPTS = Path(__file__).parent.parent / "_scripts"
 
@@ -18,6 +24,8 @@ def load_script(name):
 
 
 _embed = load_script("rag-embed.py")
+
+_FAKE_VEC = [0.1] * 768
 
 make_point_id = _embed.make_point_id
 should_skip = _embed.should_skip
@@ -153,6 +161,89 @@ class TestChunkSection(unittest.TestCase):
         """Normal heading is prepended as ## {heading}\\n\\n in chunk text."""
         chunks = chunk_section("Introduction", "body text")
         self.assertTrue(chunks[0][0].startswith("## Introduction\n\n"))
+
+
+# ── T6.30–T6.34  main() — graceful degradation ───────────────────────────────
+
+class TestMainDegradation(unittest.TestCase):
+
+    def _patch_root(self, tmpdir):
+        """Redirect _embed's root to a temp vault by patching __file__."""
+        scripts = Path(tmpdir) / "_scripts"
+        scripts.mkdir(exist_ok=True)
+        return str(scripts / "rag-embed.py")
+
+    def test_T6_30_not_configured_ollama_host_empty(self):
+        """Empty OLLAMA_HOST → 'not configured' message, ensure_collection never called."""
+        with patch.dict(os.environ, {"OLLAMA_HOST": "", "QDRANT_HOST": "somehost"}):
+            with patch("sys.argv", ["rag-embed.py", "--files"]):
+                with patch.object(_embed, "ensure_collection") as mock_ec:
+                    out = StringIO()
+                    with patch("sys.stdout", out):
+                        _embed.main()
+                    mock_ec.assert_not_called()
+                    self.assertIn("not configured", out.getvalue())
+
+    def test_T6_31_not_configured_qdrant_host_empty(self):
+        """Empty QDRANT_HOST → 'not configured' message, ensure_collection never called."""
+        with patch.dict(os.environ, {"OLLAMA_HOST": "somehost", "QDRANT_HOST": ""}):
+            with patch("sys.argv", ["rag-embed.py", "--files"]):
+                with patch.object(_embed, "ensure_collection") as mock_ec:
+                    out = StringIO()
+                    with patch("sys.stdout", out):
+                        _embed.main()
+                    mock_ec.assert_not_called()
+                    self.assertIn("not configured", out.getvalue())
+
+    def test_T6_32_qdrant_unreachable_exits_1(self):
+        """ensure_collection raises RuntimeError (Qdrant down) → stderr message, exits 1."""
+        with patch.dict(os.environ, {"OLLAMA_HOST": "somehost", "QDRANT_HOST": "somehost"}):
+            with patch("sys.argv", ["rag-embed.py", "--files"]):
+                with patch.object(_embed, "ensure_collection", side_effect=RuntimeError("Qdrant unreachable")):
+                    with self.assertRaises(SystemExit) as cm:
+                        _embed.main()
+                    self.assertEqual(cm.exception.code, 1)
+
+    def test_T6_33_all_embeds_fail_exits_1(self):
+        """All ollama_embed calls fail (Ollama down) → embed_failures > 0, total_chunks == 0 → exits 1."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            (tmp / "personal" / "resources").mkdir(parents=True, exist_ok=True)
+            (tmp / "personal" / "resources" / "note.md").write_text("## Section\n\n" + "x" * 100, encoding="utf-8")
+            original_file = _embed.__file__
+            _embed.__file__ = self._patch_root(tmpdir)
+            try:
+                with patch.dict(os.environ, {"OLLAMA_HOST": "somehost", "QDRANT_HOST": "somehost"}):
+                    with patch("sys.argv", ["rag-embed.py"]):
+                        with patch.object(_embed, "ensure_collection"):
+                            with patch.object(_embed, "ollama_embed", side_effect=urllib.error.URLError("refused")):
+                                with self.assertRaises(SystemExit) as cm:
+                                    _embed.main()
+                                self.assertEqual(cm.exception.code, 1)
+            finally:
+                _embed.__file__ = original_file
+
+    def test_T6_34_partial_failures_exit_0(self):
+        """Some embeds fail but at least one succeeds → exits 0 (partial degradation, not a hard failure)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            (tmp / "personal" / "resources").mkdir(parents=True, exist_ok=True)
+            (tmp / "personal" / "resources" / "note.md").write_text(
+                "## First\n\n" + "x" * 100 + "\n\n## Second\n\n" + "y" * 100,
+                encoding="utf-8",
+            )
+            original_file = _embed.__file__
+            _embed.__file__ = self._patch_root(tmpdir)
+            try:
+                with patch.dict(os.environ, {"OLLAMA_HOST": "somehost", "QDRANT_HOST": "somehost"}):
+                    with patch("sys.argv", ["rag-embed.py"]):
+                        with patch.object(_embed, "ensure_collection"):
+                            with patch.object(_embed, "ollama_embed",
+                                              side_effect=[_FAKE_VEC, urllib.error.URLError("refused")]):
+                                with patch.object(_embed, "upsert_batch"):
+                                    _embed.main()  # must not raise SystemExit
+            finally:
+                _embed.__file__ = original_file
 
 
 if __name__ == "__main__":

@@ -8,7 +8,8 @@ Ask the user which operation:
 **(4) Memory maintenance** — consolidate and budget AI-maintained files
 **(5) Resource note maintenance** — deduplicate and cross-link resource notes
 **(6) Documentation maintenance** — consistency check across implementation, SE docs, and README
-**(7) Reports** — automated scans, findings only, no edits
+**(7) Roadmap maintenance** — research landscape, prune implemented items, update limitations-and-roadmap.md
+**(8) Reports** — automated scans, findings only, no edits
 
 ---
 
@@ -51,7 +52,7 @@ Route items out of `_inbox/`. One file at a time — wait for confirmation befor
    a. Read the conversation file.
    b. Find all 🧠, 👤, 🗂️, and ✅ marker lines and their descriptions.
    c. For 🧠 and ✅ markers: process as `/remember` would — append a `<!-- remembered: YYYY-MM-DD -->` block to the project `_memory.md` using Edit.
-   d. For 👤 markers: route to `_self/` — behavioral observations and feedback corrections → `_self/rules.md`; profile facts → `_self/about.md`. Append a `<!-- remembered: YYYY-MM-DD -->` block using Edit.
+   d. For 👤 markers: route to `_self/` — behavioral corrections, feedback rules, or recurring failures with a Claude-side prevention → `_self/corrections.md`; profile facts → `_self/about.md`; user-side observations (failure or self-awareness, no Claude action) → `_self/reflection.md`. Append a `<!-- remembered: YYYY-MM-DD -->` block using Edit.
    e. For 🗂️ markers: process as `/distill` would — draft note, show proposed path and content, wait for user confirmation before writing.
    f. On completion: update the conversation file's `processed` frontmatter field using Edit to reflect what was actioned. Token names: `memory` (🧠), `profile` (👤), `distill` (🗂️), `task` (✅) — all match their event type exactly.
 
@@ -65,7 +66,7 @@ Route items out of `_inbox/`. One file at a time — wait for confirmation befor
 
 Consolidate and budget AI-maintained files. Propose changes — apply only with user confirmation. Always use Edit, never Write.
 
-1. **`_self/` consolidation** — check `_self/about.md` and `_self/rules.md` for:
+1. **`_self/` consolidation** — check `_self/about.md`, `_self/corrections.md`, and `_self/reflection.md` for:
    - Appended `<!-- remembered: YYYY-MM-DD -->` blocks — absorb into the appropriate sections, then remove the raw blocks
    - Duplicate bullets expressing the same trait from different angles — propose merging
    - `## Reflection` exceeding 20 bullets — propose grouping into labeled sub-clusters
@@ -168,7 +169,31 @@ Same pattern: surface each inconsistency, ask implementation vs. documentation, 
 
 ---
 
-## Option 7 — Reports
+## Option 7 — Roadmap maintenance
+
+Research the PKM + AI landscape, prune implemented items, and update `docs/limitations-and-roadmap.md`. Propose all changes — apply only with user confirmation. Always use Edit, never Write (unless adding a net-new roadmap item that doesn't exist yet).
+
+1. **Understand current state** — read `personal/projects/second-brain-setup/roadmap.md` and `personal/projects/second-brain-setup/architecture.md`. Build a list of all roadmap items and cross-check which are already reflected in the implemented components described in `architecture.md`.
+
+2. **Research** — web-search for similar PKM + AI setups and tools in the current landscape. Focus on: what they offer that sbs doesn't, what sbs has that's unique, and gaps that appear across the field.
+
+3. **Prune roadmap.md** — cross-check each item against the current implementation list from step 1:
+   - Items fully implemented → propose removal or an "implemented" annotation
+   - Competitive landscape section → propose updates based on research findings
+   - New gaps from research worth tracking → propose as new items using the existing item structure (What / Why / Reuse candidate / Starter prompt)
+
+   Show all proposed roadmap changes for user confirmation before writing.
+
+4. **Update limitations-and-roadmap.md** — read `docs/limitations-and-roadmap.md` and compare against implemented state:
+   - Near-term / medium-term items already shipped → check them off (`[x]`)
+   - Items no longer relevant → propose removal
+   - Research candidates that belong in the planned sections → propose additions under the appropriate horizon
+
+   Show all proposed limitations-and-roadmap.md changes for user confirmation before writing.
+
+---
+
+## Option 8 — Reports
 
 Run all checks and report findings. No edits.
 

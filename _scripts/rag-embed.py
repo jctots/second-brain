@@ -25,8 +25,8 @@ OVERLAP_CHARS = 200
 MIN_CHARS = 50
 BATCH_SIZE = 50
 
-SKIP_DIRS = {".git", ".claude", "_conversations", "_tests", "tags"}
-SKIP_FILES = {"index.md", "dashboard.md"}
+PARA_ROOTS = {"personal", "professional", "public"}
+SKIP_FILES = {"index.md", "CLAUDE.md", "_memory.md"}
 
 
 # ── env ───────────────────────────────────────────────────────────────────────
@@ -76,6 +76,8 @@ def qdrant_req(
             return json.load(resp)
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"Qdrant {method} {path} → {e.code}: {e.read().decode()}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Qdrant unreachable at {host}:{port} — {e.reason}") from e
 
 
 def ensure_collection(host: str, port: str, api_key: str | None) -> None:
@@ -94,8 +96,12 @@ def ensure_collection(host: str, port: str, api_key: str | None) -> None:
         print(f"Created collection '{COLLECTION}'.")
 
 
+SKIP_DIRS = {"tags"}
+
 def should_skip(rel: Path) -> bool:
     parts = rel.parts
+    if parts[0] not in PARA_ROOTS:
+        return True
     return any(p in SKIP_DIRS for p in parts) or parts[-1] in SKIP_FILES
 
 
@@ -200,14 +206,22 @@ def main() -> None:
     root = Path(__file__).parent.parent
     load_dotenv(root)
 
-    ollama_host = os.environ.get("OLLAMA_HOST", "192.168.30.33")
+    ollama_host = os.environ.get("OLLAMA_HOST", "")
     ollama_port = os.environ.get("OLLAMA_PORT", "11434")
     ollama_key = os.environ.get("OLLAMA_API_KEY") or None
-    qdrant_host = os.environ.get("QDRANT_HOST", "192.168.30.33")
+    qdrant_host = os.environ.get("QDRANT_HOST", "")
     qdrant_port = os.environ.get("QDRANT_PORT", "6333")
     qdrant_key = os.environ.get("QDRANT_API_KEY") or None
 
-    ensure_collection(qdrant_host, qdrant_port, qdrant_key)
+    if not ollama_host or not qdrant_host:
+        print("RAG not configured (OLLAMA_HOST or QDRANT_HOST not set) — skipping embed.")
+        return
+
+    try:
+        ensure_collection(qdrant_host, qdrant_port, qdrant_key)
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     for f in (args.deleted or []):
         delete_file_vectors(f, qdrant_host, qdrant_port, qdrant_key)
@@ -220,6 +234,7 @@ def main() -> None:
     batch: list[dict] = []
     total_chunks = 0
     total_files = 0
+    embed_failures = 0
 
     for md_file in md_files:
         rel = md_file.relative_to(root)
@@ -248,6 +263,7 @@ def main() -> None:
                     vec = ollama_embed(chunk_text, ollama_host, ollama_port, ollama_key)
                 except Exception as e:
                     print(f"  WARN embed failed [{file_path} / {heading}]: {e}", file=sys.stderr)
+                    embed_failures += 1
                     continue
 
                 point_id = make_point_id(file_path, heading, idx)
@@ -280,6 +296,10 @@ def main() -> None:
         upsert_batch(batch, qdrant_host, qdrant_port, qdrant_key)
 
     print(f"\nDone. {total_files} files, {total_chunks} chunks upserted to '{COLLECTION}'.")
+
+    if embed_failures > 0 and total_chunks == 0:
+        print(f"Error: all {embed_failures} embed attempts failed — Ollama may be unreachable.", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

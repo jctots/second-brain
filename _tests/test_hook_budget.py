@@ -43,7 +43,7 @@ def main() -> int:
     filter_arg = sys.argv[1] if len(sys.argv) > 1 else None
     project_filter = None if (not filter_arg or filter_arg == "all") else filter_arg.strip("/")
 
-    for self_file in ("about.md", "rules.md"):
+    for self_file in ("about.md", "corrections.md"):
         f = repo / "_self" / self_file
         if f.exists():
             check(f"_self/{self_file}", summary_length(f), failures, warnings)

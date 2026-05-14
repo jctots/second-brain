@@ -1,19 +1,19 @@
 <!--
 Template: _memory.md
 Use: Place one _memory.md in each active project folder (e.g. personal/projects/my-project/_memory.md).
-Claude reads this at the start of every session in that project and updates it on "sync memory".
+Claude reads this at the start of every session in that project and updates it on "/remember".
 
 Required sections (all projects): Current status, Key decisions, Open questions.
 Optional sections: add project-specific sections between Key decisions and Open questions
   (e.g. "Infrastructure inventory", "Design constraints", "People and roles").
-On sync memory, Claude updates each section in-place — never appends new blocks.
+On /remember, Claude updates each section in-place — never appends new blocks.
 -->
 
 # Project Memory — {project-name}
 
 [[{project-name}/index|⬅️ Project Index]]
 
-> Maintained by Claude. Updated on "sync memory" trigger.
+> Maintained by Claude. Updated on "/remember" trigger.
 > Last updated: YYYY-MM-DD
 
 ## Quick status
