@@ -17,21 +17,11 @@ Save context from the current conversation to persistent storage. Execute in ord
 
 4. **Update `## Quick status` in-place** — if the project's status or next actions have materially changed this session, update the `status:` line and `next:` list directly using Edit. This section is always current-state, never appended to.
 
-5. **Append a `<!-- remembered: YYYY-MM-DD -->` block to each target file** — using Edit (never Write), one edit per file:
-
-   ```
-   <!-- remembered: YYYY-MM-DD -->
-   - [fact or decision worth keeping]
-   - [fact or decision worth keeping]
-   ```
-
-   If nothing new is worth persisting beyond what's already in a file, skip that file.
+5. **Consolidate new content into each target file** — using Edit, absorb new facts directly into the appropriate existing sections. Merge with existing bullets where there is overlap; update in-place where a fact supersedes an existing one; only add new content that has no existing home. If nothing new is worth persisting beyond what's already in a file, skip that file.
 
 6. **Emit processed markers** — output on separate lines, only for what was actually written:
    - `🔁 [remember processed]` only if `_memory.md` was written
    - `🪪 [profile processed]` only if a `_self/` file was written
    - `📋 [task processed]` only if task-relevant content was captured
 
-7. **Run budget check** — run `python _tests/test_hook_budget.py` via Bash. If any file is at WARN (≥80%) or FAIL (>100%), emit `⚠️ [budget warn]: <filename> at <pct>%` for each affected file. No output needed if all files are within limits.
-
-8. Briefly confirm what was written and what was skipped (one line per file).
+7. Briefly confirm what was written and what was skipped (one line per file).

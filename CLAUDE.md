@@ -166,8 +166,8 @@ Format: `🗂️ [distill event]: one-line description`
 **✅ `[task event]`** — concrete next action identified for the user. Visual signal only — not routed by `/remember`; use judgment to include task-relevant content in the `_memory.md` block.
 Format: `✅ [task event]: one-line description`
 
-**📖 `[retrieve: path]`** — vault note flagged as relevant and worth reading in full. Emit when a title surfaced by the RAG hook seems directly useful to the current task. If the user confirms, read the file directly using your tools. Visual signal only — not routed by `/remember`.
-Format: `📖 [retrieve: path/to/note.md]`
+**📖 `[RAG event]`** — vault note flagged as relevant and worth reading in full. Emit when a title surfaced by the RAG hook seems directly useful to the current task. If the user confirms, read the file directly using your tools. Visual signal only — not routed by `/remember`.
+Format: `📖 [RAG event]: [Note Title](path/to/note.md)`
 
 These markers are scanned by `save-conversation.py` and written to the conversation frontmatter as `events: [memory, profile, distill, task]`. `/remember` makes a judgment pass over the current conversation — markers are signals, not the authoritative source. Missed conversations are caught by `/maintain` via `_conversations/pending-events.md` (CI-generated).
 
@@ -187,4 +187,4 @@ These markers are scanned by `save-conversation.py` and written to the conversat
 
 ## Hook injection budget
 
-Each injected file (`_self/about.md`, `_self/corrections.md`, project `CLAUDE.md`, project `_memory.md`) has a 10,000-char hard limit; warn at 8,000 (80%); consolidation target is 5,000 chars. `/remember` appends — never edits sections in-place. `/maintain` option 4 absorbs appended blocks into proper sections and consolidates to within budget.
+Each injected file (`_self/about.md`, `_self/corrections.md`, project `CLAUDE.md`, project `_memory.md`) has a 10,000-char hard limit. `/remember` consolidates new content into existing sections in-place — no raw append blocks. `/maintain` option 4 handles files that have grown large over time.

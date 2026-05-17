@@ -39,10 +39,9 @@ Each script has its own independent budget — splitting files into separate hoo
 
 ### Budget enforcement
 
-The warn threshold (80%) is enforced in two places:
+The 10,000-char limit is enforced by CI:
 
 - **CI** — [`_tests/test_hook_budget.py`](../_tests/test_hook_budget.py) runs on every push to `main` and fails the build if any file exceeds 10,000 chars.
-- **`/remember`** — step 7 of the `/remember` command runs `_tests/test_hook_budget.py` after writing context files and emits `⚠️ [budget warn]` for any file at or above the warn threshold.
 
 ### Verifying hook health
 
@@ -78,7 +77,7 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 
 1. Makes a judgment pass over the full conversation — markers are signals, not the authoritative source
 2. Updates `## Quick status` in-place if project state changed materially
-3. Appends a `<!-- remembered: YYYY-MM-DD -->` block to each target file using Edit (never Write)
+3. Consolidates new content into existing sections in-place — merging with existing bullets where there is overlap, updating where a fact supersedes an existing one, adding only content with no existing home
 4. Emits processed markers for what was actually written: `🔁 [remember processed]` (`_memory.md`), `🪪 [profile processed]` (`_self/`), `📋 [task processed]` (tasks)
 
 **When to run:** At the end of any session with significant decisions or state changes.
@@ -102,7 +101,7 @@ Defined as Markdown files in `.claude/commands/`. Invoked by typing `/command-na
 - **Generate artifacts** — run all scripts locally, same as CI: `generate-conversation-index.py`, `generate-project-indices.py`, `generate-dashboard.py`, `generate-pending-events.py`
 - **Inbox processing** — route `_inbox/` items to the right PARA location; flag distill candidates
 - **Event processing** — surface and process missed events from past conversations via `_conversations/pending-events.md`
-- **Memory maintenance** — `_self/` consolidation and project `_memory.md` budget management
+- **Memory maintenance** — condense AI-maintained files that have grown large
 - **Resource note maintenance** — deduplicate and cross-link notes in `resources/`
 - **Documentation maintenance** — consistency check across implementation, SE docs, and README
 - **Reports** — structural audit, PARA lifecycle, inbox aging, conversation frontmatter gaps
@@ -138,7 +137,7 @@ Embeds the query via Ollama, searches Qdrant, returns top results ranked by simi
 **`_self/about.md`** — Claude maintains this across sessions via `/remember`. Growth policy:
 
 - New behavioral observations are **merged into existing bullets** rather than appended (if a bullet already covers the observation, it's updated in place)
-- When the `## Reflection` section exceeds ~20 bullets, `/remember` re-clusters them into labeled sub-groups
+- When the `## Behavioral patterns` section exceeds ~20 bullets, `/maintain` option 4 re-clusters them into labeled sub-groups
 
 **`_self/corrections.md`** — grows from corrections, confirmed preferences, and known failure modes. Claude saves an entry when you correct an approach ("don't do X") or explicitly confirm a non-obvious one ("yes, keep doing that"). Recurring failures (AI or user) are captured in the `## Known failure modes` section with root cause and prevention. Entries are never appended automatically — they require an explicit signal from you.
 

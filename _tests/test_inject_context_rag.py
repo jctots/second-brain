@@ -142,7 +142,7 @@ class TestMainDegradation(unittest.TestCase):
 
 class TestMainFiltering(unittest.TestCase):
 
-    _ENV = {"OLLAMA_HOST": "somehost", "QDRANT_HOST": "somehost"}
+    _ENV = {"OLLAMA_HOST": "somehost", "QDRANT_HOST": "somehost", "RAG_SCORE_THRESHOLD": "0.55"}
 
     def _run(self, tmp, results, prompt="query"):
         out = _Utf8Out()

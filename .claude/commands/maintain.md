@@ -5,7 +5,7 @@ Ask the user which operation:
 **(1) Generate artifacts** — run scripts locally, same as CI
 **(2) Inbox processing** — route inbox items to the right PARA location
 **(3) Event processing** — surface and process missed events from past conversations
-**(4) Memory maintenance** — consolidate and budget AI-maintained files
+**(4) Memory maintenance** — condense AI-maintained files that have grown large
 **(5) Resource note maintenance** — deduplicate and cross-link resource notes
 **(6) Documentation maintenance** — consistency check across implementation, SE docs, and README
 **(7) Roadmap maintenance** — research landscape, prune implemented items, update limitations-and-roadmap.md
@@ -64,20 +64,16 @@ Route items out of `_inbox/`. One file at a time — wait for confirmation befor
 
 ## Option 4 — Memory maintenance
 
-Consolidate and budget AI-maintained files. Propose changes — apply only with user confirmation. Always use Edit, never Write.
+Exceptional maintenance for AI-maintained files that have grown large with genuine content. Propose changes — apply only with user confirmation. Target file size after consolidation: ≤ 5,000 chars.
 
-1. **`_self/` consolidation** — check `_self/about.md`, `_self/corrections.md`, and `_self/reflection.md` for:
-   - Appended `<!-- remembered: YYYY-MM-DD -->` blocks — absorb into the appropriate sections, then remove the raw blocks
-   - Duplicate bullets expressing the same trait from different angles — propose merging
-   - `## Reflection` exceeding 20 bullets — propose grouping into labeled sub-clusters
-   - Files over 80% of budget (8,000 chars) — identify candidates for condensing; flag as urgent if over 10,000 chars
+1. **`_self/` consolidation** — for each large `_self/` file (`about.md`, `corrections.md`, `reflection.md`):
+   - Duplicate or mergeable bullets expressing the same trait from different angles — propose merging
+   - `## Behavioral patterns` in `reflection.md` exceeding 20 bullets — propose grouping into labeled sub-clusters
 
-2. **Project memory consolidation** — for each active project, if `_memory.md` exceeds 8,000 chars:
-   - Read the full file — distinguish structured sections from raw appended blocks (`<!-- remembered: ... -->`)
-   - Consolidate appended blocks into the appropriate sections
-   - Route aging content: key decisions → create `decisions/D{n}-{slug}.md` and add a row to `decisions/index.md` (newest first); stable reference → skip or note for `/distill`; superseded items → delete
-   - Target file size after consolidation: ≤ 5,000 chars
-   - Propose the consolidated version for user confirmation before writing
+2. **Project memory consolidation** — for each active project with a large `_memory.md`:
+   - Route aging content: key decisions → create `decisions/D{n}-{slug}.md` and add a row to `decisions/index.md` (newest first)
+   - stable reference → skip or note for `/distill`
+   - superseded items → delete
 
 ---
 

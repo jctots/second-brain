@@ -12,11 +12,14 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-COLLECTION = "second_brain"
-EMBED_MODEL = "embeddinggemma:latest"
-QUERY_LIMIT = 10
-MAX_FILES = 3
-SCORE_THRESHOLD = 0.55
+_DEFAULTS = {
+    "RAG_COLLECTION": "second_brain",
+    "RAG_EMBED_MODEL": "embeddinggemma:latest",
+    "RAG_QUERY_LIMIT": "10",
+    "RAG_MAX_FILES": "3",
+    "RAG_SCORE_THRESHOLD": "0.30",
+    "RAG_TIMEOUT": "5",
+}
 
 
 # ── env ───────────────────────────────────────────────────────────────────────
@@ -34,27 +37,27 @@ def load_dotenv(root: Path) -> None:
 
 # ── Ollama ────────────────────────────────────────────────────────────────────
 
-def ollama_embed(text: str, host: str, port: str, api_key: str | None) -> list[float]:
+def ollama_embed(text: str, host: str, port: str, api_key: str | None, model: str, timeout: int) -> list[float]:
     url = f"http://{host}:{port}/api/embeddings"
-    payload = json.dumps({"model": EMBED_MODEL, "prompt": text}).encode()
+    payload = json.dumps({"model": model, "prompt": text}).encode()
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Content-Type", "application/json")
     if api_key:
         req.add_header("Authorization", f"Bearer {api_key}")
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.load(resp)["embedding"]
 
 
 # ── Qdrant ────────────────────────────────────────────────────────────────────
 
-def qdrant_search(vector: list[float], host: str, port: str, api_key: str | None) -> list[dict]:
-    url = f"http://{host}:{port}/collections/{COLLECTION}/points/search"
-    payload = json.dumps({"vector": vector, "limit": QUERY_LIMIT, "with_payload": True}).encode()
+def qdrant_search(vector: list[float], host: str, port: str, api_key: str | None, collection: str, limit: int, timeout: int) -> list[dict]:
+    url = f"http://{host}:{port}/collections/{collection}/points/search"
+    payload = json.dumps({"vector": vector, "limit": limit, "with_payload": True}).encode()
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Content-Type", "application/json")
     if api_key:
         req.add_header("api-key", api_key)
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.load(resp)["result"]
 
 
@@ -106,12 +109,19 @@ def main() -> None:
     qdrant_port = os.environ.get("QDRANT_PORT", "6333")
     qdrant_key = os.environ.get("QDRANT_API_KEY") or None
 
+    collection = os.environ.get("RAG_COLLECTION", _DEFAULTS["RAG_COLLECTION"])
+    embed_model = os.environ.get("RAG_EMBED_MODEL", _DEFAULTS["RAG_EMBED_MODEL"])
+    query_limit = int(os.environ.get("RAG_QUERY_LIMIT", _DEFAULTS["RAG_QUERY_LIMIT"]))
+    max_files = int(os.environ.get("RAG_MAX_FILES", _DEFAULTS["RAG_MAX_FILES"]))
+    score_threshold = float(os.environ.get("RAG_SCORE_THRESHOLD", _DEFAULTS["RAG_SCORE_THRESHOLD"]))
+    timeout = int(os.environ.get("RAG_TIMEOUT", _DEFAULTS["RAG_TIMEOUT"]))
+
     if not ollama_host or not qdrant_host or not prompt.strip():
         sys.exit(0)
 
     try:
-        vec = ollama_embed(prompt, ollama_host, ollama_port, ollama_key)
-        results = qdrant_search(vec, qdrant_host, qdrant_port, qdrant_key)
+        vec = ollama_embed(prompt, ollama_host, ollama_port, ollama_key, embed_model, timeout)
+        results = qdrant_search(vec, qdrant_host, qdrant_port, qdrant_key, collection, query_limit, timeout)
     except (urllib.error.URLError, OSError):
         sys.exit(0)
 
@@ -119,17 +129,17 @@ def main() -> None:
     for hit in results:
         fp = hit["payload"].get("file_path", "")
         score = hit["score"]
-        if score >= SCORE_THRESHOLD and (fp not in seen or score > seen[fp]):
+        if score >= score_threshold and (fp not in seen or score > seen[fp]):
             seen[fp] = score
 
-    top_files = sorted(seen.items(), key=lambda x: x[1], reverse=True)[:MAX_FILES]
+    top_files = sorted(seen.items(), key=lambda x: x[1], reverse=True)[:max_files]
     if not top_files:
         sys.exit(0)
 
     lines = ["## Relevant vault notes"]
-    for fp, _ in top_files:
+    for fp, score in top_files:
         title = extract_h1(cwd / fp)
-        lines.append(f"- {fp} — {title}")
+        lines.append(f"- {fp} — {title} [{score:.2f}]")
     print("\n".join(lines))
 
 

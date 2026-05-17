@@ -23,21 +23,23 @@ This is a personal project — there are no release dates or commitments. Items 
 
 - [x] **Gitea Actions workflow** — CI pipeline: auto-generates `_conversations/index.md`, project indexes, dashboard, and PDF sidecars on push
 - [ ] **Automated sanitization** — replace manual flag-and-review with a regex pass that substitutes known patterns automatically, reducing friction on each sync to upstream
+- [ ] **Weekly review command** — a `/review` command that runs a structured weekly reflection: inbox status, project health check, open action items. Produces a dated review note.
 
 
 ## 🔭 Medium-term
 
 - [x] **Semantic search across vault** — query notes by meaning, not just keyword. Implemented via Qdrant + Ollama (`embeddinggemma:latest`) at Tier 2/3. Active search via `/search`; passive surfacing via `inject-context-rag.py` hook.
-- [ ] **Mobile capture workflow** — a lightweight path for quick inbox drops from mobile without VS Code. *Addresses: mobile AI-assistance limitation.* Likely Obsidian mobile + obsidian-git, or a minimal web form writing to the vault via the git API.
-- [ ] **Maps of Content (MOC) generation** — a command that generates or updates a hub note for a topic, linking all related notes grouped semantically.
+- [x] **Mobile capture workflow** — a lightweight path for quick inbox drops from mobile without VS Code. Implemented via Obsidian mobile + obsidian-git on a dedicated `mobile` branch; `/sync` merges back to `main`.
+- [x] **Maps of Content (MOC) generation** — covered by the generated dashboard (CI-built hub note with tag-grouped resource links) and `/distill` for manual extraction.
 
 
 ## 💭 Ideas (not committed)
 
 - [ ] **Multi-agent pattern for long tasks** — spawn parallel subagents for research + draft + review on complex notes.
-- [ ] **Cross-vault search command** — searches across personal/, professional/, and public/ simultaneously, returning ranked results with PARA category and project context.
+- [x] **Cross-vault search command** — searches across personal/, professional/, and public/ simultaneously, returning ranked results with PARA category and project context. Implemented via `/search` + Qdrant (Tier 2/3).
 - [ ] **Obsidian plugin integration** — context loading from within Obsidian, without needing VS Code open.
 - [ ] **Proactive/heartbeat agent** — a scheduled process that reviews recent `_inbox/` and `_daily/` entries and surfaces patterns or action items without being explicitly asked.
+- [ ] **Cross-CLI harness compatibility** — evaluate whether the harness (hooks, slash commands, context injection) transfers to other AI CLIs. The vault files and scripts are tool-agnostic; document what is Claude Code–specific and what a porting guide would need to cover.
 
 
 ## 💬 Contributing ideas
