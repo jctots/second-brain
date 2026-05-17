@@ -18,7 +18,7 @@ created: 2026-04-29
 
 | # | Name | Summary | Location |
 |---|---|---|---|
-| A1 | Memory capture model | Vault-native; `/remember` judgment pass; markers as visual + backstop signal; `/maintain` consolidates | [§ A1](#a1--memory-capture-model) |
+| A1 | Memory capture model | Vault-native; `/remember` judgment pass, consolidates in-place; markers as visual + backstop signal; `/maintain` for exceptional size maintenance | [§ A1](#a1--memory-capture-model) |
 | A2 | Gitea Actions workflows | CI owns derived artifacts; local hooks only block bad commits | [§ A2](#a2--gitea-actions-workflows) |
 | A3 | Hook guarantee | If a behavior must happen every session without fail, it needs a hook — instructions are not guaranteed | [§ Claude Code interface](#claude-code-interface) |
 | A4 | RAG degrades to nothing | RAG is an enhancement, not a dependency — all invocation points exit cleanly when services are unavailable or unconfigured | [§ RAG pipeline](#rag-pipeline) |
@@ -435,14 +435,9 @@ Claude emits visual markers mid-conversation when it notices something worth cap
 
 At session end, `/remember` does a **judgment pass over the current conversation** — the full conversation is already in context, so this has no additional token cost. Claude extracts what's worth saving after the conversation has settled, avoiding intermediate states that may have been contradicted later in the session.
 
-Output: one appended block per target file. Always appends — never edits in-place.
+Output: new facts absorbed directly into the appropriate existing sections — merging with existing bullets where there is overlap, updating in-place where a fact supersedes an existing one. Never appends raw blocks.
 
-```
-<!-- remembered: YYYY-MM-DD -->
-- [what was captured]
-```
-
-`/remember` writes to project `_memory.md` always, and to `_self/about.md` or `_self/corrections.md` when 👤 profile content is present. All target files are append-only — never edits sections in-place. It does not scan markers — the full conversation is the signal.
+`/remember` writes to project `_memory.md` always, and to `_self/about.md` or `_self/corrections.md` when 👤 profile content is present. It does not scan markers — the full conversation is the signal.
 
 #### `/maintain` — backstop and consolidation
 
@@ -450,7 +445,7 @@ Two jobs:
 
 **Backstop** — for past conversations where `/remember` was not run, `/maintain` scans 🧠 and 👤 markers. 🧠 markers are appended to `_memory.md`; 👤 markers are routed to `_self/about.md` or `_self/corrections.md` with judgment.
 
-**Consolidation** — when `_memory.md` or `_self/` files exceed 8,000 chars, `/maintain` merges appended `<!-- remembered: -->` blocks into the structured sections, routes aging content to `decisions/` or drops it, and targets ≤ 5,000 chars post-consolidation. Dropped items are intentional — working memory fades.
+**Exceptional maintenance** — when files have grown large with genuine content over time, `/maintain` routes aging decisions to `decisions/`, stable reference to `/distill`, and targets ≤ 5,000 chars post-consolidation. Dropped items are intentional — working memory fades.
 
 #### Missed capture coverage
 
@@ -528,7 +523,7 @@ Location: `.claude/commands/`
 | Command | When to use |
 |---|---|
 | `/init` | Initialize a new vault entry — asks goal, inputs, and context; proposes PARA category + slug; creates project folder (4 files) or single area/resource file; updates dashboard |
-| `/remember` | End of session — judgment pass over current conversation, appends captures to project `_memory.md` |
+| `/remember` | End of session — judgment pass over current conversation, consolidates new content into project `_memory.md` and `_self/` files in-place |
 | `/distill` | Periodic — process 🗂️ event markers from current conversation into `resources/` notes |
 | `/maintain` | Periodic vault operations — 7 options: generate artifacts, inbox processing, event processing, memory maintenance, resource note maintenance, documentation maintenance, reports |
 | `/sync` | Git operations — commit staged work, check or pull framework updates |
@@ -726,6 +721,12 @@ Environment variables — loaded from `.env` at vault root (gitignored), or inje
 | `QDRANT_HOST` | (none — RAG disabled if empty) | Qdrant hostname or IP |
 | `QDRANT_PORT` | `6333` | |
 | `QDRANT_API_KEY` | (none) | Optional |
+| `RAG_COLLECTION` | `second_brain` | Qdrant collection name |
+| `RAG_EMBED_MODEL` | `embeddinggemma:latest` | Ollama model used for embedding |
+| `RAG_QUERY_LIMIT` | `10` | Raw results fetched from Qdrant before filtering |
+| `RAG_MAX_FILES` | `3` | Max titles injected per turn |
+| `RAG_SCORE_THRESHOLD` | `0.30` | Minimum similarity score to include a result |
+| `RAG_TIMEOUT` | `5` | Seconds before Ollama/Qdrant requests time out |
 
 `.env.example` at vault root documents the expected variables. `.env` is gitignored — never committed.
 
