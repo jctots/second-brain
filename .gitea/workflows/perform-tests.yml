@@ -38,3 +38,9 @@ jobs:
 
       - name: T8 — Inject context RAG
         run: python3 _tests/test_inject_context_rag.py
+
+      - name: Notify failure
+        if: failure() && secrets.NTFY_URL != ''
+        run: |
+          curl -s -d "❌ ${{ github.workflow }} failed on ${{ github.ref_name }} — ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}" \
+            ${{ secrets.NTFY_URL }}/gitea-ci

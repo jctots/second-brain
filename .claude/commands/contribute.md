@@ -27,6 +27,7 @@ Filter out content paths — never contribute anything under:
 Also block these framework-path files — they exist in both repos but serve different purposes and must never be a straight copy:
 - `.gitignore` — the upstream version includes content-blocking entries the private vault does not need; changes must be crafted manually per the upstream version, not copied from the vault
 - `dashboard.md` — generated file containing personal project links; the upstream version is a blank starter
+- `.obsidian/` and `.obsidian-mobile/` — personal Obsidian settings (vault layout, plugins, keybindings); never contributed regardless of content
 
 **Allowed exceptions under `personal/projects/second-brain-setup/`** (second-brain-setup SE docs, not private content):
 - `architecture.md`

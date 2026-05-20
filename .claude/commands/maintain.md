@@ -75,6 +75,11 @@ Exceptional maintenance for AI-maintained files that have grown large with genui
    - stable reference → skip or note for `/distill`
    - superseded items → delete
 
+3. **Next Actions staleness audit** — surface implied next actions not yet captured in `## Next Actions`. For each active project:
+   a. Read `_memory.md` — scan `## Current Status` and `## Open questions` for anything that implies a pending action not already listed in `## Next Actions`.
+   b. Read `_conversations/pending-events.md` — find any unprocessed ✅ markers for this project that haven't been captured as Next Actions.
+   c. Propose additions as plain bullets. Show proposed additions grouped by project and wait for user confirmation before writing to `_memory.md`.
+
 ---
 
 ## Option 5 — Resource note maintenance

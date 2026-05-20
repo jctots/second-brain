@@ -16,16 +16,18 @@ On /remember, Claude updates each section in-place — never appends new blocks.
 > Maintained by Claude. Updated on "/remember" trigger.
 > Last updated: YYYY-MM-DD
 
-## Quick status
+## Snapshot
 
-<!-- status: project state at milestone level — must stay accurate between sessions without updates.
-     next: meaningful project actions only — no commit/push/remember housekeeping. -->
-status: One-line summary of where this project stands right now
-next:
+<!-- One-line summary of project state — accurate for days or weeks. Updated by /remember. -->
+One-line summary of where this project stands right now
+
+## Next Actions
+
+<!-- Meaningful project actions only — no git ops, no /remember, no housekeeping. -->
 - First next action
 - Second next action
 
-## Current status
+## Current Status
 
 Brief description of where this project stands right now.
 

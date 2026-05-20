@@ -1,44 +1,41 @@
 #!/usr/bin/env python3
-# Generates "## files", "## relevant conversations", and "## quick status" sections in all project index.md files.
+# Generates "## files", "## relevant conversations", "## snapshot", and "## next actions" sections in all project index.md files.
 # Run from repo root: python _scripts/generate-project-indices.py
 import re
 from pathlib import Path
 
 
-def parse_quick_status(memory_path):
+def parse_snapshot(memory_path):
     if not memory_path.exists():
         return None, []
     lines = memory_path.read_text(encoding="utf-8").splitlines()
-    in_section = False
-    status = None
+    snapshot = None
     next_items = []
-    in_next = False
+    current_section = None
     for line in lines:
-        if re.match(r"^## Quick status\s*$", line, re.IGNORECASE):
-            in_section = True
+        if re.match(r"^## Snapshot\s*$", line, re.IGNORECASE):
+            current_section = "snapshot"
             continue
-        if in_section and re.match(r"^## ", line):
-            break
-        if not in_section:
+        if re.match(r"^## Next Actions\s*$", line, re.IGNORECASE):
+            current_section = "next"
             continue
-        m = re.match(r"^status:\s*(.+)$", line)
-        if m:
-            status = m.group(1).strip()
-            in_next = False
+        if re.match(r"^## ", line):
+            current_section = None
             continue
-        if re.match(r"^next:\s*$", line):
-            in_next = True
-            continue
-        if in_next and line.startswith("- "):
+        if current_section == "snapshot" and line.strip() and snapshot is None:
+            snapshot = line.strip()
+        elif current_section == "next" and line.startswith("- "):
             next_items.append(line[2:].strip())
-    return status, next_items
+    return snapshot, next_items
 
 
 SECTIONS = {
-    "quick status": "⚡ Quick Status",
+    "snapshot": "⚡ Snapshot",
+    "next actions": "📌 Next Actions",
     "files": "📁 Files",
     "relevant conversations": "💬 Relevant Conversations",
 }
+LEGACY_SECTIONS = ["quick status"]
 
 
 def remove_section(lines, keyword):
@@ -120,23 +117,24 @@ def update_index(dir_path, index_path, wl_prefix, conv_entries, memory_path=None
 
     has_conv_section = bool(re.search(r"^## .*relevant conversations\s*$", content, re.MULTILINE | re.IGNORECASE))
 
-    # Compute quick status content before stripping
-    qs_lines = None
+    # Compute snapshot and next actions before stripping
+    snap_lines = None
+    next_lines = None
     if memory_path is not None:
-        status, next_items = parse_quick_status(memory_path)
-        if status is not None:
-            qs_lines = [f"**status:** {status}", ""]
-            if next_items:
-                qs_lines += ["**next:**"] + [f"- {item}" for item in next_items]
-            else:
-                qs_lines += ["**next:** —"]
+        snapshot, next_items = parse_snapshot(memory_path)
+        if snapshot is not None:
+            snap_lines = [snapshot]
+        if snapshot is not None:
+            next_lines = [f"- 🔲 {item}" for item in next_items] if next_items else ["_No open actions._"]
 
-    # Strip all managed sections, then re-append in enforced order
-    for keyword in SECTIONS:
+    # Strip all managed sections (including legacy), then re-append in enforced order
+    for keyword in list(SECTIONS.keys()) + LEGACY_SECTIONS:
         lines = remove_section(lines, keyword)
 
-    if qs_lines is not None:
-        lines = append_section(lines, SECTIONS["quick status"], qs_lines)
+    if snap_lines is not None:
+        lines = append_section(lines, SECTIONS["snapshot"], snap_lines)
+    if next_lines is not None:
+        lines = append_section(lines, SECTIONS["next actions"], next_lines)
     lines = append_section(lines, SECTIONS["files"], file_lines)
 
     if conv_entries or has_conv_section:
