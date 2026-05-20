@@ -8,33 +8,21 @@ from datetime import date
 from pathlib import Path
 
 
-def parse_quick_status(memory_path):
+def parse_snapshot(memory_path):
     if not memory_path.exists():
         return None, []
     lines = memory_path.read_text(encoding="utf-8").splitlines()
+    snapshot = None
     in_section = False
-    status = None
-    next_items = []
-    in_next = False
     for line in lines:
-        if re.match(r"^## Quick status\s*$", line, re.IGNORECASE):
+        if re.match(r"^## Snapshot\s*$", line, re.IGNORECASE):
             in_section = True
             continue
         if in_section and re.match(r"^## ", line):
             break
-        if not in_section:
-            continue
-        m = re.match(r"^status:\s*(.+)$", line)
-        if m:
-            status = m.group(1).strip()
-            in_next = False
-            continue
-        if re.match(r"^next:\s*$", line):
-            in_next = True
-            continue
-        if in_next and line.startswith("- "):
-            next_items.append(line[2:].strip())
-    return status, next_items
+        if in_section and line.strip() and snapshot is None:
+            snapshot = line.strip()
+    return snapshot, []
 
 
 def parse_frontmatter_tags(file_path):
@@ -100,7 +88,7 @@ def collect_projects(para_dir):
         if not item.is_dir():
             continue
         wl = f"[[{item.name}/index|{item.name}]]"
-        status, _ = parse_quick_status(item / "_memory.md")
+        status, _ = parse_snapshot(item / "_memory.md")
         results.append((wl, status))
     return results
 

@@ -68,6 +68,10 @@ def find_project_from_file(cwd: Path, file_path: str) -> list[Path]:
     return []
 
 
+def strip_ide_selection(message: str) -> str:
+    return re.sub(r"<ide_selection>.*?</ide_selection>", "", message, flags=re.DOTALL)
+
+
 def find_projects_in_message(cwd: Path, message: str) -> list[Path]:
     message_lower = message.lower()
     found = []
@@ -124,7 +128,7 @@ def main():
 
     if transcript_path:
         message = hook_data.get("prompt", "") or get_first_user_message(transcript_path) or ""
-        projects = find_projects_in_message(cwd, message)
+        projects = find_projects_in_message(cwd, strip_ide_selection(message))
         if not projects:
             ide_file = get_ide_opened_file(transcript_path)
             if ide_file:

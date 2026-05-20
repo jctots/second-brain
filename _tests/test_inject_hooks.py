@@ -434,6 +434,65 @@ class TestInjectContextMain(unittest.TestCase):
             assert rc == 0
             assert out.strip() == ""
 
+    def test_t2_42_ide_selection_does_not_override_explicit_project(self):
+        """IDE selection containing a different project's path must not inject that project
+        when an explicit project name is already present in the typed message."""
+        with tempfile.TemporaryDirectory() as d:
+            vault = Path(d)
+            for name, content in [("explicit-project", "# Explicit"), ("other-project", "# Other")]:
+                p = vault / "personal" / "projects" / name
+                p.mkdir(parents=True)
+                (p / "CLAUDE.md").write_text(content, encoding="utf-8")
+            ide_sel = (
+                "<ide_selection>The user selected lines from "
+                f"{vault}/personal/projects/other-project/file.md:\nsome content\n</ide_selection>"
+            )
+            prompt = f"{ide_sel}\n\nproject: explicit-project\ndo some work"
+            t = self._t(d, prompt)
+            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": prompt})
+            rc, out = run_script("inject-context-claude.py", hook)
+            assert rc == 0
+            assert "# Explicit" in out
+            assert "# Other" not in out
+
+    def test_t2_43_ide_selection_alone_does_not_inject(self):
+        """An <ide_selection> block with a project path but no explicit project name
+        and no 'opened file' annotation must not trigger any injection."""
+        with tempfile.TemporaryDirectory() as d:
+            vault, _ = self._vault(d, "my-project", claude="# MyProject")
+            ide_sel = (
+                "<ide_selection>The user selected lines from "
+                f"{vault}/personal/projects/my-project/file.md:\nsome content\n</ide_selection>"
+            )
+            prompt = f"{ide_sel}\n\nno project name here"
+            t = self._t(d, prompt)
+            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": prompt})
+            rc, out = run_script("inject-context-claude.py", hook)
+            assert rc == 0
+            assert out.strip() == ""
+
+
+# --- T2.44: strip_ide_selection ---
+
+class TestStripIdeSelection(unittest.TestCase):
+
+    def test_t2_44_strips_ide_selection_block(self):
+        msg = "<ide_selection>path/to/cv-update-job-search/file.md\ncontent\n</ide_selection>\nproject: home-lab"
+        result = _context.strip_ide_selection(msg)
+        assert "cv-update-job-search" not in result
+        assert "project: home-lab" in result
+
+    def test_t2_45_no_ide_selection_unchanged(self):
+        msg = "project: home-lab\nsome question"
+        assert _context.strip_ide_selection(msg) == msg
+
+    def test_t2_46_multiple_ide_selection_blocks_stripped(self):
+        msg = "<ide_selection>block1</ide_selection> text <ide_selection>block2</ide_selection> keep"
+        result = _context.strip_ide_selection(msg)
+        assert "block1" not in result
+        assert "block2" not in result
+        assert "keep" in result
+
 
 # --- Smoke tests ---
 

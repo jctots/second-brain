@@ -43,3 +43,9 @@ jobs:
         env:
           OLLAMA_HOST: ${{ secrets.OLLAMA_HOST }}
           QDRANT_HOST: ${{ secrets.QDRANT_HOST }}
+
+      - name: Notify failure
+        if: failure() && secrets.NTFY_URL != ''
+        run: |
+          curl -s -d "❌ ${{ github.workflow }} failed on ${{ github.ref_name }} — ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}" \
+            ${{ secrets.NTFY_URL }}/gitea-ci

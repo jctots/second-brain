@@ -123,7 +123,7 @@ Each active project folder may contain a `_memory.md` file — a running log of 
 
 **Trigger:** Run `/remember` at the end of any conversation. Steps are defined in `.claude/commands/remember.md`.
 
-**Quick status rules:** `status:` describes project state at milestone level — accurate for days or weeks, not tied to a specific pending action. `next:` lists meaningful project actions only — no git ops, no `/remember`, no housekeeping.
+**Project memory sections:** `## Snapshot` holds a one-liner project state — accurate for days or weeks, not tied to a specific pending action. `## Next Actions` lists meaningful project actions only — no git ops, no `/remember`, no housekeeping; plain bullets. `## Current Status` holds the longer narrative loaded for context injection.
 
 **Reminder:** At the end of each working session, if 🧠, 🗂️, or ✅ event markers were emitted during the conversation and `/remember` or `/distill` has not been run, remind the user: _"Events were captured this session — run `/remember` and/or `/distill` to process them."_
 

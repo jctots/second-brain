@@ -109,58 +109,57 @@ class TestCollectResources(unittest.TestCase):
             assert result == []
 
 
-# --- T5.8-T5.13: parse_quick_status ---
+# --- T5.8-T5.13: parse_snapshot ---
 
-class TestParseQuickStatus(unittest.TestCase):
+class TestParseSnapshot(unittest.TestCase):
 
     def _write(self, path, content):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
 
-    def test_t5_8_status_and_next_extracted(self):
+    def test_t5_8_snapshot_text_extracted(self):
         with tempfile.TemporaryDirectory() as d:
             m = Path(d) / "_memory.md"
-            self._write(m, "## Quick status\n\nstatus: Active phase\nnext:\n- Do thing A\n- Do thing B\n")
-            status, nexts = _dash.parse_quick_status(m)
+            self._write(m, "## Snapshot\n\nActive phase\n")
+            status, nexts = _dash.parse_snapshot(m)
             assert status == "Active phase"
-            assert "Do thing A" in nexts
-            assert "Do thing B" in nexts
+            assert nexts == []
 
-    def test_t5_9_status_trailing_whitespace_stripped(self):
+    def test_t5_9_snapshot_trailing_whitespace_stripped(self):
         with tempfile.TemporaryDirectory() as d:
             m = Path(d) / "_memory.md"
-            self._write(m, "## Quick status\n\nstatus: Active phase   \n")
-            status, _ = _dash.parse_quick_status(m)
+            self._write(m, "## Snapshot\n\nActive phase   \n")
+            status, _ = _dash.parse_snapshot(m)
             assert status == "Active phase"
 
     def test_t5_10_file_does_not_exist(self):
-        status, nexts = _dash.parse_quick_status(Path("/nonexistent/_memory.md"))
+        status, nexts = _dash.parse_snapshot(Path("/nonexistent/_memory.md"))
         assert status is None
         assert nexts == []
 
-    def test_t5_11_no_quick_status_section(self):
+    def test_t5_11_no_snapshot_section(self):
         with tempfile.TemporaryDirectory() as d:
             m = Path(d) / "_memory.md"
-            self._write(m, "## Something else\n\nstatus: nope\n")
-            status, nexts = _dash.parse_quick_status(m)
+            self._write(m, "## Something else\n\nSome text\n")
+            status, nexts = _dash.parse_snapshot(m)
             assert status is None
             assert nexts == []
 
-    def test_t5_12_no_status_line(self):
+    def test_t5_12_empty_snapshot_section(self):
         with tempfile.TemporaryDirectory() as d:
             m = Path(d) / "_memory.md"
-            self._write(m, "## Quick status\n\nnext:\n- Do thing\n")
-            status, nexts = _dash.parse_quick_status(m)
+            self._write(m, "## Snapshot\n\n## Next Actions\n\n- Do thing\n")
+            status, nexts = _dash.parse_snapshot(m)
             assert status is None
-            assert "Do thing" in nexts
+            assert nexts == []
 
     def test_t5_13_stops_at_next_heading(self):
         with tempfile.TemporaryDirectory() as d:
             m = Path(d) / "_memory.md"
-            self._write(m, "## Quick status\n\nstatus: OK\nnext:\n- Item\n\n## Other section\n\nstatus: should not appear\n")
-            status, nexts = _dash.parse_quick_status(m)
+            self._write(m, "## Snapshot\n\nOK\n\n## Other section\n\nshould not appear\n")
+            status, nexts = _dash.parse_snapshot(m)
             assert status == "OK"
-            assert len(nexts) == 1
+            assert nexts == []
 
 
 # --- T5.14-T5.18: parse_frontmatter_tags ---

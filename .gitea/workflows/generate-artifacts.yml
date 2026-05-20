@@ -48,3 +48,9 @@ jobs:
           git diff --cached --quiet || git commit -m "chore: regenerate indexes, pending events, and PDF sidecars (from ${TRIGGER_SHA})"
           git push
           git push origin HEAD:mobile
+
+      - name: Notify failure
+        if: failure() && secrets.NTFY_URL != ''
+        run: |
+          curl -s -d "❌ ${{ github.workflow }} failed on ${{ github.ref_name }} — ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}" \
+            ${{ secrets.NTFY_URL }}/gitea-ci
