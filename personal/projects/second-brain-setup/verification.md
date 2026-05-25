@@ -93,6 +93,14 @@ This is a health check script, not a unit test file. It runs against the real va
 | T2.27 | Second path part is not `projects` | Returns `[]` | R11 |
 | T2.28 | Derived project directory does not exist on disk | Returns `[]` | R11 |
 
+### `strip_ide_selection(message)`
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T2.44 | Message contains one `<ide_selection>` block with a project path | Block stripped; rest of message preserved | |
+| T2.45 | Message contains no `<ide_selection>` block | Message returned unchanged | |
+| T2.46 | Message contains multiple `<ide_selection>` blocks | All blocks stripped; other content preserved | |
+
 ### `find_projects_in_message(cwd, message)`
 
 | # | Scenario | Expected | Req |
@@ -115,6 +123,8 @@ This is a health check script, not a unit test file. It runs against the real va
 | T2.39 | IDE fallback attempted but IDE file not in a project dir | No output, exits 0 | R11 |
 | T2.40 | Both message and IDE match same project | Project appears only once (IDE fallback only runs when message lookup returns empty) | |
 | T2.41 | Second turn (assistant entry in transcript) | Exits 0, no output | |
+| T2.42 | Explicit project in message + `<ide_selection>` block containing a different project's path | Only explicit project injected; IDE selection project not loaded | |
+| T2.43 | `<ide_selection>` block with project path, no explicit project name, no "opened file" annotation | No output — IDE selection alone does not trigger injection | |
 
 ---
 
