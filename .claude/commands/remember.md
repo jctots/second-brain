@@ -19,11 +19,20 @@ Save context from the current conversation to persistent storage. Execute in ord
 
 5. **Update `## Snapshot` and `## Next Actions` in-place** — if the project's status or next actions have materially changed this session, update the `## Snapshot` text and `## Next Actions` list directly using Edit. Both sections are always current-state, never appended to. Write plain bullets in `## Next Actions` — no emoji prefix.
 
-6. **Review `## Next Actions` items** — if the list has items, first close any that were clearly completed this session (no prompt needed). Then display all remaining items numbered, and ask the user using AskUserQuestion with two options (use Other for selective actions: `close 1, 3` to remove specific items, or `handle 1, 3` to address specific items in conversation now):
-   - "All still open — keep all"
-   - "All done — close all"
+6. **Review `## Next Actions` items** — if the list has items, first close any that were clearly completed this session (no prompt needed, edit the file directly). Then, if items remain, generate a **handover prompt** — a copy-pastable block the user can paste at the start of the next session to continue. Include a one-liner summary of what was accomplished this session, then list the open items. Format as a fenced code block:
 
-   Interpret Other input: `close N[, N...]` → remove those items; `handle N[, N...]` → address each in conversation then remove them. Skip this step entirely if `## Next Actions` is empty after auto-closing completed items.
+   ```
+   project: <project-name>
+
+   Last session: <one-line summary of what was done>.
+
+   Continuing next actions:
+   1. <item>
+   2. <item>
+   ...
+   ```
+
+   Display the handover prompt and stop — do not close or modify the remaining items. They will be handled in the session where the handover prompt is used. Skip this step entirely if `## Next Actions` is empty after auto-closing completed items.
 
 7. **Emit processed markers** — output on separate lines, only for what was actually written:
    - `🔁 [remember processed]` only if `_memory.md` was written

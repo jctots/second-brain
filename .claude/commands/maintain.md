@@ -66,6 +66,8 @@ Route items out of `_inbox/`. One file at a time — wait for confirmation befor
 
 Exceptional maintenance for AI-maintained files that have grown large with genuine content. Propose changes — apply only with user confirmation. Target file size after consolidation: ≤ 5,000 chars.
 
+0. **Size survey** — run `python _tests/test_hook_budget.py` to get current sizes and identify which files are over threshold before doing any work. Report the output; use it to prioritise what to consolidate.
+
 1. **`_self/` consolidation** — for each large `_self/` file (`about.md`, `corrections.md`, `reflection.md`):
    - Duplicate or mergeable bullets expressing the same trait from different angles — propose merging
    - `## Behavioral patterns` in `reflection.md` exceeding 20 bullets — propose grouping into labeled sub-clusters
