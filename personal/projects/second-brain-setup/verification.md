@@ -10,10 +10,11 @@ Scenarios are identified as **T#.#** — first number is the test file, second i
 | T2 | `test_inject_hooks.py` | `inject-profile.py`, `inject-corrections.py`, `inject-context-claude.py`, `inject-context-memory.py` |
 | T3 | `test_save_conversation.py` | `save-conversation.py` |
 | T4 | `test_generate_pending_events.py` | `generate-pending-events.py` |
-| T5 | `test_generate_dashboard.py` | `generate-dashboard.py` |
+| T5 | `test_generate_dashboard.py` | `generate-dashboard.py` — resource/area collection, snapshot parsing (incl. next actions), tag pages, system health block |
 | T6 | `test_rag_embed.py` | `rag-embed.py` — point ID stability, skip logic, chunking contracts, graceful degradation |
 | T7 | `test_rag_search.py` | `rag-search.py` — graceful degradation (not configured, services down, happy path) |
-| T8 | `test_inject_context_rag.py` | `inject-context-rag.py` — H1 extraction (frontmatter state machine, stem fallback), graceful degradation, threshold filtering, deduplication, output format |
+| T8 | `test_inject_context_rag.py` | `inject-context-rag.py` — H1 extraction (frontmatter state machine, stem fallback), graceful degradation, failure notification and sentinel, threshold filtering, deduplication, output format |
+| T9 | `test_generate_project_indices.py` | `generate-project-indices.py` — subfolder index generation (auto-create, skip conditions, backlink format) |
 
 Fixtures are created in `tempfile.TemporaryDirectory` per test and cleaned up after. Smoke tests run against the real vault (Gitea CI — full content available).
 
@@ -241,16 +242,17 @@ This is a health check script, not a unit test file. It runs against the real va
 | T5.6 | `index.md` at the resource root level | Excluded — not treated as a resource entry | R7 |
 | T5.7 | File with non-`.md` extension in resources | Excluded | R7 |
 
-### `parse_quick_status(memory_path)`
+### `parse_snapshot(memory_path)`
 
 | # | Scenario | Expected | Req |
 |---|---|---|---|
-| T5.8 | `_memory.md` has `## Quick status` with `status:` and `next:` items | Both extracted correctly | R7 |
-| T5.9 | `status:` line has trailing whitespace | Stripped | R7 |
+| T5.8 | `_memory.md` has `## Snapshot` with text | Snapshot text extracted correctly | R7 |
+| T5.9 | Snapshot line has trailing whitespace | Stripped | R7 |
 | T5.10 | `_memory.md` does not exist | Returns `(None, [])` — no crash | R11 |
-| T5.11 | `_memory.md` exists but has no `## Quick status` section | Returns `(None, [])` | R11 |
-| T5.12 | `## Quick status` section has no `status:` line | Returns `(None, [])` for status, next items still parsed | R7 |
+| T5.11 | `_memory.md` exists but has no `## Snapshot` section | Returns `(None, [])` | R11 |
+| T5.12 | `## Snapshot` empty, `## Next Actions` has bullets | Status is `None`; next items returned correctly | R7 |
 | T5.13 | Section ends at next `##` heading | Parsing stops at heading boundary correctly | R7 |
+| T5.23 | `## Snapshot` and `## Next Actions` both present with content | Snapshot text and all next action bullets returned | R7 |
 
 ### `parse_frontmatter_tags(file_path)`
 
@@ -269,6 +271,17 @@ This is a health check script, not a unit test file. It runs against the real va
 | T5.19 | Resources with tags exist | Each tag page has correct frontmatter (`context`, `para`, `tags`, `created`) and back link | R7 |
 | T5.20 | Tag page already exists from previous run | `created` date preserved — rerun does not overwrite it | R7 |
 | T5.21 | No tagged resources exist | `tags/` directory written but empty, no crash | R11 |
+
+### `generate_health_block(root)`
+
+Health signals are sourced from: `_conversations/pending-events.md` (event counts), `_inbox/` (file count), `_self/*.md` + active project `CLAUDE.md`/`_memory.md` (char sizes vs. 5k target / 8k warn), `.rag-status` (RAG sentinel). Issues produce individual lines; clean state produces a single OK summary line.
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T5.24 | No pending events, empty inbox, all files under 5k, no rag-status | Single line with all-OK status parts | R7, R11 |
+| T5.25 | `pending-events.md` lists conversations with event types | Issue line with per-type counts and `/maintain` option 3 prompt | R7 |
+| T5.26 | `_inbox/` contains 2 `.md` files | Issue line with count and `/maintain` option 2 prompt | R7 |
+| T5.27 | `.rag-status` contains `error\|TIMESTAMP\|REASON` | Issue line with "unavailable" and timestamp detail | R12 |
 
 ### Smoke test
 
@@ -367,7 +380,7 @@ This is a health check script, not a unit test file. It runs against the real va
 | T8.5 | `OLLAMA_HOST` not set | Exits 0, no output; `ollama_embed` never called | R12 |
 | T8.6 | `QDRANT_HOST` not set | Exits 0, no output; `ollama_embed` never called | R12 |
 | T8.7 | `prompt` field is empty or whitespace | Exits 0, no output | R12 |
-| T8.8 | `ollama_embed` or `qdrant_search` raises `URLError` | Exits 0, no output | R12 |
+| T8.8 | `OLLAMA_HOST` set, `ollama_embed` raises `URLError`, no sentinel present | Exits 0; emits ⚠️ warning naming the service and address | R12 |
 
 ### `main()` — filtering and deduplication
 
@@ -383,6 +396,34 @@ This is a health check script, not a unit test file. It runs against the real va
 | # | Scenario | Expected | Req |
 |---|---|---|---|
 | T8.13 | Two results above threshold with known files | Output is exactly `## Relevant vault notes\n- {path} — {title}` per result; em dash and spacing correct; highest-score file first | R11 |
+
+### `main()` — failure notification and sentinel
+
+Sentinel file `.rag-status` in the vault root tracks RAG availability across turns. Format: `ok` or `error\|TIMESTAMP\|REASON` (pipe-delimited to avoid ambiguity with colons in timestamps). Only first-failure and recovery transitions produce output — repeat failures in the same error state are silent.
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T8.14 | Ollama URLError, sentinel already present with error state | Exits 0, no output — repeat failure suppressed | R12 |
+| T8.15 | Ollama ok, Qdrant URLError, no sentinel present | Exits 0; emits ⚠️ warning naming Qdrant and its address | R12 |
+| T8.16 | Error sentinel present, both services now reachable | Emits ✅ recovery message including the error timestamp from the sentinel | R12 |
+| T8.17 | First failure (no sentinel) | Sentinel file created; content starts with `error\|` and includes reason string | R12 |
+| T8.18 | Successful run | Sentinel file written with content `ok` | R12 |
+
+---
+
+## T9 — `test_generate_project_indices.py`
+
+### `update_index()` — subfolder index generation
+
+Subdirectories within a project that contain `.md` files but have no `index.md` get a generated stub so they are navigable from the project index. Stubs are never overwritten after initial creation. Directories starting with `_` and empty directories are excluded.
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T9.1 | Subdir has `.md` files, no `index.md` | `index.md` generated; subdir linked from parent `## 📁 Files` section | R7 |
+| T9.2 | Subdir already has `index.md` | Existing file not overwritten — original content preserved | R7 |
+| T9.3 | Subdir name starts with `_` | Skipped — no `index.md` generated, not linked from parent | R4 |
+| T9.4 | Subdir has no `.md` files | Not treated as content subdir — no `index.md` generated | R7 |
+| T9.5 | Generated stub | Contains backlink `[[{project}/index\|⬅️ {project}]]` pointing to project root | R7 |
 
 ---
 

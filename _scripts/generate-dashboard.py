@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Generates the project-status list and TOC sections in dashboard.md.
+# Generates the project-status list, TOC sections, and system health block in dashboard.md.
 # Preserves everything above the first --- separator (manual header).
 # Run from repo root: python _scripts/generate-dashboard.py
 import re
@@ -13,16 +13,23 @@ def parse_snapshot(memory_path):
         return None, []
     lines = memory_path.read_text(encoding="utf-8").splitlines()
     snapshot = None
-    in_section = False
+    next_items = []
+    current_section = None
     for line in lines:
         if re.match(r"^## Snapshot\s*$", line, re.IGNORECASE):
-            in_section = True
+            current_section = "snapshot"
             continue
-        if in_section and re.match(r"^## ", line):
-            break
-        if in_section and line.strip() and snapshot is None:
+        if re.match(r"^## Next Actions\s*$", line, re.IGNORECASE):
+            current_section = "next"
+            continue
+        if re.match(r"^## ", line):
+            current_section = None
+            continue
+        if current_section == "snapshot" and line.strip() and snapshot is None:
             snapshot = line.strip()
-    return snapshot, []
+        elif current_section == "next" and line.startswith("- "):
+            next_items.append(line[2:].strip())
+    return snapshot, next_items
 
 
 def parse_frontmatter_tags(file_path):
@@ -82,14 +89,14 @@ def collect_flat(para_dir):
 
 
 def collect_projects(para_dir):
-    """Return list of (wikilink, status) tuples for all project dirs."""
+    """Return list of (wikilink, status, next_count) tuples for all project dirs."""
     results = []
     for item in sorted(para_dir.iterdir()):
         if not item.is_dir():
             continue
         wl = f"[[{item.name}/index|{item.name}]]"
-        status, _ = parse_snapshot(item / "_memory.md")
-        results.append((wl, status))
+        status, next_items = parse_snapshot(item / "_memory.md")
+        results.append((wl, status, len(next_items)))
     return results
 
 
@@ -146,6 +153,124 @@ def generate_tag_pages(root):
         print(f"Generated {len(tag_map)} tag pages in {ctx}/resources/tags/")
 
 
+# ── system health ─────────────────────────────────────────────────────────────
+
+def parse_pending_events(root):
+    """Parse pending-events.md and return dict of event_type → count."""
+    pending_file = root / "_conversations" / "pending-events.md"
+    if not pending_file.exists():
+        return {}
+    counts = {}
+    for line in pending_file.read_text(encoding="utf-8").splitlines():
+        m = re.search(r"pending:\s*(.+)$", line)
+        if m:
+            for event in m.group(1).split(","):
+                event = event.strip()
+                if event:
+                    counts[event] = counts.get(event, 0) + 1
+    return counts
+
+
+def count_inbox(root):
+    """Return count of .md files in _inbox/."""
+    inbox = root / "_inbox"
+    if not inbox.exists():
+        return 0
+    return sum(1 for f in inbox.iterdir() if f.is_file() and f.suffix == ".md")
+
+
+def check_hook_budget(root):
+    """Return list of (display_path, char_count, is_warn) for files exceeding the 5k target."""
+    TARGET = 5_000
+    WARN = 8_000
+    flagged = []
+
+    for name in ("about.md", "corrections.md"):
+        f = root / "_self" / name
+        if f.exists():
+            size = len(f.read_text(encoding="utf-8"))
+            if size > TARGET:
+                flagged.append((f"_self/{name}", size, size > WARN))
+
+    for ctx in ("personal", "professional", "public"):
+        projects_dir = root / ctx / "projects"
+        if not projects_dir.exists():
+            continue
+        for project_dir in sorted(projects_dir.iterdir()):
+            if not project_dir.is_dir():
+                continue
+            for fname in ("CLAUDE.md", "_memory.md"):
+                f = project_dir / fname
+                if f.exists():
+                    size = len(f.read_text(encoding="utf-8"))
+                    if size > TARGET:
+                        flagged.append((f"{ctx}/projects/{project_dir.name}/{fname}", size, size > WARN))
+
+    return flagged
+
+
+def read_rag_status(root):
+    """Return ('ok'|'error'|'unknown', details_str)."""
+    status_file = root / ".rag-status"
+    if not status_file.exists():
+        return "unknown", ""
+    parts = status_file.read_text(encoding="utf-8").strip().split("|", 2)
+    if parts[0] == "error" and len(parts) == 3:
+        return "error", f"unavailable since {parts[1]} ({parts[2]})"
+    if parts[0] == "ok":
+        return "ok", ""
+    return "unknown", ""
+
+
+def generate_health_block(root):
+    """Return lines for the ## ⚡ System Health section."""
+    lines = ["## ⚡ System Health", ""]
+    issues = []
+    ok_parts = []
+
+    event_counts = parse_pending_events(root)
+    if event_counts:
+        parts = [f"{v} {k}" for k, v in sorted(event_counts.items())]
+        issues.append(f"📬 **Pending events:** {' · '.join(parts)} — run `/maintain` option 3")
+    else:
+        ok_parts.append("📬 no pending events")
+
+    inbox_count = count_inbox(root)
+    if inbox_count > 0:
+        noun = "item" if inbox_count == 1 else "items"
+        issues.append(f"📦 **Inbox:** {inbox_count} {noun} — run `/maintain` option 2")
+    else:
+        ok_parts.append("📦 inbox empty")
+
+    flagged = check_hook_budget(root)
+    warn_files = [(p, s) for p, s, is_warn in flagged if is_warn]
+    over_target = [(p, s) for p, s, is_warn in flagged if not is_warn]
+    if warn_files:
+        for p, s in warn_files:
+            issues.append(f"⚠️ **Budget:** `{p}` {s:,} chars — run `/maintain` option 4")
+    elif over_target:
+        issues.append(f"📊 **Budget:** {len(over_target)} file(s) over 5k target — run `/maintain` option 4")
+    else:
+        ok_parts.append("📊 budget OK")
+
+    rag_state, rag_detail = read_rag_status(root)
+    if rag_state == "error":
+        issues.append(f"🔍 **RAG:** {rag_detail}")
+    elif rag_state == "unknown":
+        ok_parts.append("🔍 RAG unconfigured")
+    else:
+        ok_parts.append("🔍 RAG OK")
+
+    if issues:
+        lines.extend(issues)
+    else:
+        lines.append(" · ".join(ok_parts))
+
+    return lines
+
+
+# ── TOC ───────────────────────────────────────────────────────────────────────
+
 CTX_EMOJI = {"personal": "🏠", "professional": "💼", "public": "🌐"}
 PARA_EMOJI = {"projects": "📋", "areas": "🗂️", "resources": "📚"}
 PARA_LABEL = {"projects": "Projects", "areas": "Areas", "resources": "Resources"}
@@ -173,8 +298,10 @@ def generate_toc(root):
                     lines.append("")
                     continue
                 lines.append(f"{pe} **{pl}:**")
-                for wl, status in entries:
+                for wl, status, next_count in entries:
                     suffix = f" — {status}" if status else ""
+                    if next_count > 0:
+                        suffix += f" · {next_count} open"
                     lines.append(f"- {wl}{suffix}")
                 lines.append("")
 
@@ -227,10 +354,13 @@ def main():
         manual_header.pop()
 
     generate_tag_pages(root)
+    health_lines = generate_health_block(root)
     toc_lines = generate_toc(root)
 
     new_lines = (
         manual_header
+        + ["", "---", ""]
+        + health_lines
         + ["", "---", ""]
         + toc_lines
     )

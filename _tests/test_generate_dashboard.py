@@ -145,13 +145,13 @@ class TestParseSnapshot(unittest.TestCase):
             assert status is None
             assert nexts == []
 
-    def test_t5_12_empty_snapshot_section(self):
+    def test_t5_12_empty_snapshot_next_actions_still_parsed(self):
         with tempfile.TemporaryDirectory() as d:
             m = Path(d) / "_memory.md"
             self._write(m, "## Snapshot\n\n## Next Actions\n\n- Do thing\n")
             status, nexts = _dash.parse_snapshot(m)
             assert status is None
-            assert nexts == []
+            assert nexts == ["Do thing"]
 
     def test_t5_13_stops_at_next_heading(self):
         with tempfile.TemporaryDirectory() as d:
@@ -260,6 +260,90 @@ class TestGenerateTagPages(unittest.TestCase):
             _dash.generate_tag_pages(root)
             tags_dir = root / "personal" / "resources" / "tags"
             assert not tags_dir.exists() or list(tags_dir.iterdir()) == []
+
+
+# --- T5.23: parse_snapshot returns next items ---
+
+class TestParseSnapshotNextItems(unittest.TestCase):
+
+    def _write(self, path, content):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+    def test_t5_23_next_actions_returned(self):
+        """## Next Actions bullets → returned in nexts list; snapshot text also correct."""
+        with tempfile.TemporaryDirectory() as d:
+            m = Path(d) / "_memory.md"
+            self._write(m, "## Snapshot\n\nActive\n\n## Next Actions\n\n- Do A\n- Do B\n")
+            status, nexts = _dash.parse_snapshot(m)
+            assert status == "Active"
+            assert nexts == ["Do A", "Do B"]
+
+
+# --- T5.24-T5.27: generate_health_block ---
+
+class TestGenerateHealthBlock(unittest.TestCase):
+
+    def _make_root(self, tmp):
+        root = Path(tmp)
+        (root / "_conversations").mkdir()
+        (root / "_self").mkdir()
+        (root / "_inbox").mkdir()
+        return root
+
+    def _write_pending(self, root, lines):
+        content = "<!-- AUTO-GENERATED -->\n\n# Pending Events\n\n" + "\n".join(lines) + "\n"
+        (root / "_conversations" / "pending-events.md").write_text(content, encoding="utf-8")
+
+    def test_t5_24_no_issues_ok_line(self):
+        """No pending events, empty inbox, no oversized files, no rag-status → single OK line."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_root(tmp)
+            result = _dash.generate_health_block(root)
+        # Should contain the ok summary line (no issue lines)
+        full = "\n".join(result)
+        assert "📬 no pending events" in full
+        assert "📦 inbox empty" in full
+        assert "budget OK" in full
+
+    def test_t5_25_pending_events_shown(self):
+        """Pending events present → issue line with event type counts."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_root(tmp)
+            self._write_pending(root, [
+                "- [[conv-a]] — pending: memory, distill",
+                "- [[conv-b]] — pending: memory",
+            ])
+            result = _dash.generate_health_block(root)
+        full = "\n".join(result)
+        assert "Pending events" in full
+        assert "2 memory" in full
+        assert "1 distill" in full
+        assert "/maintain" in full
+
+    def test_t5_26_inbox_items_shown(self):
+        """Inbox has .md files → issue line with count."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_root(tmp)
+            (root / "_inbox" / "capture.md").write_text("# note", encoding="utf-8")
+            (root / "_inbox" / "another.md").write_text("# note2", encoding="utf-8")
+            result = _dash.generate_health_block(root)
+        full = "\n".join(result)
+        assert "Inbox" in full
+        assert "2 items" in full
+
+    def test_t5_27_rag_error_shown(self):
+        """rag-status file has error state → issue line with service detail."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_root(tmp)
+            (root / ".rag-status").write_text(
+                "error|2026-05-28 09:00|Ollama unreachable (host:11434)", encoding="utf-8"
+            )
+            result = _dash.generate_health_block(root)
+        full = "\n".join(result)
+        assert "RAG" in full
+        assert "unavailable" in full
+        assert "2026-05-28 09:00" in full
 
 
 # --- Smoke test ---

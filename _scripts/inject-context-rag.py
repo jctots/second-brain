@@ -3,6 +3,7 @@
 # Every turn: embeds user message → queries Qdrant top-3 files above threshold → injects titles.
 # Claude judges relevance and reads files directly if the user confirms.
 # Graceful degradation: outputs nothing if Ollama/Qdrant is unconfigured or unreachable.
+# Failure notification: emits a warning on first failure; silent on repeat failures; emits recovery on restore.
 from __future__ import annotations
 
 import json
@@ -10,6 +11,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 _DEFAULTS = {
@@ -20,6 +22,8 @@ _DEFAULTS = {
     "RAG_SCORE_THRESHOLD": "0.30",
     "RAG_TIMEOUT": "5",
 }
+
+_STATUS_FILE = ".rag-status"
 
 
 # ── env ───────────────────────────────────────────────────────────────────────
@@ -83,6 +87,45 @@ def extract_h1(path: Path) -> str:
     return path.stem
 
 
+# ── status sentinel ───────────────────────────────────────────────────────────
+
+def read_status(cwd: Path) -> tuple[str, str, str]:
+    """Returns (state, timestamp, reason). state is 'ok', 'error', or 'unknown'."""
+    try:
+        content = (cwd / _STATUS_FILE).read_text(encoding="utf-8").strip()
+        parts = content.split("|", 2)
+        if parts[0] == "error" and len(parts) == 3:
+            return "error", parts[1], parts[2]
+        if parts[0] == "ok":
+            return "ok", "", ""
+    except (OSError, ValueError):
+        pass
+    return "unknown", "", ""
+
+
+def write_status(cwd: Path, state: str, reason: str = "") -> None:
+    try:
+        if state == "ok":
+            (cwd / _STATUS_FILE).write_text("ok", encoding="utf-8")
+        else:
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+            (cwd / _STATUS_FILE).write_text(f"error|{ts}|{reason}", encoding="utf-8")
+    except OSError:
+        pass  # never break the hook on a write failure
+
+
+# ── ntfy ──────────────────────────────────────────────────────────────────────
+
+def ntfy_notify(base_url: str, topic: str, title: str, message: str) -> None:
+    try:
+        url = f"{base_url.rstrip('/')}/{topic}"
+        req = urllib.request.Request(url, data=message.encode("utf-8"), method="POST")
+        req.add_header("Title", title)
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass  # never break the hook on ntfy failure
+
+
 # ── main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -116,14 +159,41 @@ def main() -> None:
     score_threshold = float(os.environ.get("RAG_SCORE_THRESHOLD", _DEFAULTS["RAG_SCORE_THRESHOLD"]))
     timeout = int(os.environ.get("RAG_TIMEOUT", _DEFAULTS["RAG_TIMEOUT"]))
 
+    ntfy_url = os.environ.get("NTFY_URL", "")
+    ntfy_topic = os.environ.get("RAG_NTFY_TOPIC", "second-brain-rag")
+
     if not ollama_host or not qdrant_host or not prompt.strip():
         sys.exit(0)
 
+    prev_state, prev_ts, _ = read_status(cwd)
+
     try:
         vec = ollama_embed(prompt, ollama_host, ollama_port, ollama_key, embed_model, timeout)
+    except (urllib.error.URLError, OSError):
+        reason = f"Ollama unreachable ({ollama_host}:{ollama_port})"
+        if prev_state != "error":
+            print(f"⚠️ RAG unavailable — {reason}. RAG results will not be surfaced until the service recovers.")
+            write_status(cwd, "error", reason)
+            if ntfy_url:
+                ntfy_notify(ntfy_url, ntfy_topic, "⚠️ Second Brain RAG unavailable", reason)
+        sys.exit(0)
+
+    try:
         results = qdrant_search(vec, qdrant_host, qdrant_port, qdrant_key, collection, query_limit, timeout)
     except (urllib.error.URLError, OSError):
+        reason = f"Qdrant unreachable ({qdrant_host}:{qdrant_port})"
+        if prev_state != "error":
+            print(f"⚠️ RAG unavailable — {reason}. RAG results will not be surfaced until the service recovers.")
+            write_status(cwd, "error", reason)
+            if ntfy_url:
+                ntfy_notify(ntfy_url, ntfy_topic, "⚠️ Second Brain RAG unavailable", reason)
         sys.exit(0)
+
+    if prev_state == "error":
+        print(f"✅ RAG restored — Ollama and Qdrant reachable again (was down since {prev_ts}).")
+        if ntfy_url:
+            ntfy_notify(ntfy_url, ntfy_topic, "✅ Second Brain RAG restored", f"RAG restored — was down since {prev_ts}.")
+    write_status(cwd, "ok")
 
     seen: dict[str, float] = {}
     for hit in results:
