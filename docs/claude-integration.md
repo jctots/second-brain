@@ -22,6 +22,25 @@ Claude Code supports hooks that execute shell commands at specific lifecycle eve
 
 For component interfaces and data flows, see [second-brain-setup/architecture.md — Claude Code interface](../personal/projects/second-brain-setup/architecture.md#claude-code-interface).
 
+### RAG failure notification
+
+`inject-context-rag.py` distinguishes between two failure modes:
+
+- **Not configured** (`OLLAMA_HOST` or `QDRANT_HOST` not set) — completely silent; intended for Tier 1 deployments where RAG services don't exist.
+- **Configured but unavailable** (`URLError` when services are set) — emits a notification, because silence here means something broke.
+
+When services are configured but unreachable:
+
+| Event | What you see |
+|---|---|
+| First failure | Claude receives a ⚠️ warning line naming the failing service and address; relays it to you in that turn |
+| Repeat failures (same session) | Silent — no warning per turn while services stay down |
+| Recovery | Claude receives a ✅ line on the first turn services become reachable again, including the timestamp from when the outage started |
+
+State is tracked in `.rag-status` in the vault root (gitignored). Format: `ok` or `error|TIMESTAMP|REASON` (pipe-delimited).
+
+**Optional push notification:** Set `NTFY_URL` to your ntfy base URL in `.env`. The hook posts to `{NTFY_URL}/{RAG_NTFY_TOPIC}` on first failure and on recovery. `RAG_NTFY_TOPIC` defaults to `second-brain-rag` — override in `.env` if your ntfy instance uses a different naming scheme.
+
 ## 💰 Context injection budget
 
 Claude Code caps all hook output at **10,000 characters per hook**. Content beyond that is silently truncated and replaced with a file reference — there's no warning, and Claude won't notice it happened.

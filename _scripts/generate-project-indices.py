@@ -92,6 +92,28 @@ def parse_conv_frontmatter(path):
     return fm
 
 
+def _has_md_content(dir_path):
+    """Return True if dir_path contains any .md files (non-index) or non-_ subdirs with content."""
+    for item in dir_path.iterdir():
+        if item.is_file() and item.suffix == ".md" and item.name != "index.md":
+            return True
+        if item.is_dir() and not item.name.startswith("_"):
+            return True
+    return False
+
+
+def _ensure_subdir_index(sub_dir, wl_prefix):
+    """Generate a minimal index.md stub for sub_dir if one doesn't exist."""
+    sub_index = sub_dir / "index.md"
+    if sub_index.exists():
+        return sub_index
+    project_name = wl_prefix.split("/")[0]
+    stub = f"# {sub_dir.name}\n\n[[{project_name}/index|⬅️ {project_name}]]\n"
+    sub_index.write_text(stub, encoding="utf-8")
+    print(f"Generated: {sub_index}")
+    return sub_index
+
+
 def update_index(dir_path, index_path, wl_prefix, conv_entries, memory_path=None):
     file_lines = []
     items = sorted(dir_path.iterdir(), key=lambda x: x.name)
@@ -100,7 +122,11 @@ def update_index(dir_path, index_path, wl_prefix, conv_entries, memory_path=None
         if item.name == "index.md":
             continue
         if item.is_dir():
+            if item.name.startswith("_"):
+                continue
             sub_index = item / "index.md"
+            if not sub_index.exists() and _has_md_content(item):
+                sub_index = _ensure_subdir_index(item, wl_prefix)
             if sub_index.exists():
                 sub_wl = f"{wl_prefix}/{item.name}"
                 file_lines.append(f"- [[{sub_wl}/index|{item.name}]]")
