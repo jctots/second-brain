@@ -179,10 +179,29 @@ def count_inbox(root):
     return sum(1 for f in inbox.iterdir() if f.is_file() and f.suffix == ".md")
 
 
+def _read_budget_warn(root) -> int:
+    hard, warn_pct = 10_000, 80
+    env_file = root / ".env"
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line.startswith("HOOK_BUDGET_HARD="):
+                try:
+                    hard = int(line.split("=", 1)[1].strip())
+                except ValueError:
+                    pass
+            elif line.startswith("HOOK_BUDGET_WARN_PCT="):
+                try:
+                    warn_pct = int(line.split("=", 1)[1].strip())
+                except ValueError:
+                    pass
+    return int(hard * warn_pct / 100)
+
+
 def check_hook_budget(root):
     """Return list of (display_path, char_count, is_warn) for files exceeding the 5k target."""
     TARGET = 5_000
-    WARN = 8_000
+    WARN = _read_budget_warn(root)
     flagged = []
 
     for name in ("about.md", "corrections.md"):

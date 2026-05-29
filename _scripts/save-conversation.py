@@ -1,11 +1,37 @@
 #!/usr/bin/env python3
 # Claude Code Stop/SessionEnd hook — reads hook JSON from stdin, saves conversation transcript
 # to _conversations/ as a formatted markdown file.
+import os
 import sys
 import re
 import json
+import urllib.error
+import urllib.request
 from pathlib import Path
 from datetime import datetime, timedelta
+
+
+def _load_dotenv(cwd: str | None) -> None:
+    if not cwd:
+        return
+    env_file = Path(cwd) / ".env"
+    if not env_file.exists():
+        return
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, _, v = line.partition("=")
+            os.environ.setdefault(k.strip(), v.strip())
+
+
+def _ntfy(base_url: str, topic: str, title: str, message: str) -> None:
+    try:
+        url = f"{base_url.rstrip('/')}/{topic}"
+        req = urllib.request.Request(url, data=message.encode("utf-8"), method="POST")
+        req.add_header("Title", title)
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
 
 
 EVENT_MARKERS = {
@@ -328,6 +354,20 @@ def main():
 
     output_path = output_dir / filename
     output_path.write_text("\n".join(parts), encoding="utf-8")
+
+    pending = [e for e in events if e not in processed]
+    if pending and "--notify" in sys.argv:
+        _load_dotenv(cwd)
+        ntfy_url = os.environ.get("NTFY_URL", "")
+        ntfy_topic = os.environ.get("NTFY_TOPIC", "second-brain")
+        ntfy_on_events = os.environ.get("NTFY_ON_EVENTS", "true").lower() != "false"
+        if ntfy_url and ntfy_on_events:
+            session = Path(filename).stem
+            _ntfy(
+                ntfy_url, ntfy_topic,
+                "📬 Second Brain: events pending",
+                f"{session}: {', '.join(pending)} — run /remember",
+            )
 
 
 if __name__ == "__main__":

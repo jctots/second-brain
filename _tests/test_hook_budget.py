@@ -12,8 +12,33 @@ Exit codes:
 import sys
 from pathlib import Path
 
-LIMIT = 10_000      # hard limit per file — CI fails above this
-WARN_AT = 0.80      # warn when file reaches 80% of limit (8,000 chars)
+
+def _load_dotenv(repo: Path) -> dict:
+    env_file = repo / ".env"
+    if not env_file.exists():
+        return {}
+    result = {}
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, _, v = line.partition("=")
+            result[k.strip()] = v.strip()
+    return result
+
+
+def _budget_config(repo: Path) -> tuple[int, float]:
+    env = _load_dotenv(repo)
+    try:
+        hard = int(env.get("HOOK_BUDGET_HARD", "10000"))
+    except ValueError:
+        hard = 10_000
+    try:
+        warn_pct = float(env.get("HOOK_BUDGET_WARN_PCT", "80"))
+    except ValueError:
+        warn_pct = 80.0
+    return hard, warn_pct / 100.0
+
+
 CONTEXTS = ["personal", "professional", "public"]
 
 
@@ -21,24 +46,25 @@ def summary_length(path: Path) -> int:
     return len(path.read_text(encoding="utf-8"))
 
 
-def check(label: str, n: int, failures: list, warnings: list) -> None:
-    pct = n / LIMIT
-    if n > LIMIT:
-        print(f"FAIL {label}: {n}/{LIMIT} chars ({pct:.0%})")
+def check(label: str, n: int, failures: list, warnings: list, limit: int, warn_at: float) -> None:
+    pct = n / limit
+    if n > limit:
+        print(f"FAIL {label}: {n}/{limit} chars ({pct:.0%})")
         failures.append(label)
-    elif pct >= WARN_AT:
-        print(f"WARN {label}: {n}/{LIMIT} chars ({pct:.0%} — approaching limit)")
+    elif pct >= warn_at:
+        print(f"WARN {label}: {n}/{limit} chars ({pct:.0%} — approaching limit)")
         warnings.append(label)
     else:
-        print(f"OK   {label}: {n}/{LIMIT} chars ({pct:.0%})")
+        print(f"OK   {label}: {n}/{limit} chars ({pct:.0%})")
 
 
 def main() -> int:
     repo = Path(__file__).parent.parent
+    LIMIT, WARN_AT = _budget_config(repo)
     failures: list[str] = []
     warnings: list[str] = []
 
-    # Optional filter: python test_r6_hook_budget.py personal/projects/my-project
+    # Optional filter: python test_hook_budget.py personal/projects/my-project
     # Matches project path suffix; "all" or omitted runs everything.
     filter_arg = sys.argv[1] if len(sys.argv) > 1 else None
     project_filter = None if (not filter_arg or filter_arg == "all") else filter_arg.strip("/")
@@ -46,7 +72,7 @@ def main() -> int:
     for self_file in ("about.md", "corrections.md"):
         f = repo / "_self" / self_file
         if f.exists():
-            check(f"_self/{self_file}", summary_length(f), failures, warnings)
+            check(f"_self/{self_file}", summary_length(f), failures, warnings, LIMIT, WARN_AT)
         else:
             print(f"FAIL _self/{self_file}: not found")
             failures.append(f"_self/{self_file} missing")
@@ -64,7 +90,7 @@ def main() -> int:
             for filename in ("CLAUDE.md", "_memory.md"):
                 f = project_dir / filename
                 if f.exists():
-                    check(f"{label_prefix}/{filename}", summary_length(f), failures, warnings)
+                    check(f"{label_prefix}/{filename}", summary_length(f), failures, warnings, LIMIT, WARN_AT)
 
     print()
     if failures:

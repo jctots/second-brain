@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """T3 — Tests for save-conversation.py"""
 import importlib.util
+import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 SCRIPTS = Path(__file__).parent.parent / "_scripts"
@@ -352,6 +355,68 @@ class TestSaveConversationMain(unittest.TestCase):
             hook = json.dumps({"transcript_path": str(t), "cwd": str(cwd)})
             rc, _ = run_script(hook)
             assert rc == 0
+
+
+# --- T3.40-T3.42: ntfy on unprocessed events ---
+
+class TestNtfyOnUnprocessedEvents(unittest.TestCase):
+
+    def _hook(self, tmp_dir, entries):
+        cwd = Path(tmp_dir)
+        (cwd / "_conversations").mkdir(exist_ok=True)
+        t = cwd / "t.jsonl"
+        make_transcript(t, entries)
+        return json.dumps({"transcript_path": str(t), "cwd": str(cwd)})
+
+    def _run(self, hook_json, env=None, notify=False):
+        argv = ["save-conversation.py"] + (["--notify"] if notify else [])
+        with unittest.mock.patch("sys.stdin", io.StringIO(hook_json)):
+            with unittest.mock.patch("sys.argv", argv):
+                with unittest.mock.patch.dict(os.environ, env or {}, clear=True):
+                    with unittest.mock.patch("urllib.request.urlopen") as mock_open:
+                        try:
+                            _sc.main()
+                        except SystemExit:
+                            pass
+                        return mock_open.call_count
+
+    def test_t3_40_ntfy_called_when_events_unprocessed_and_url_set(self):
+        with tempfile.TemporaryDirectory() as d:
+            entries = basic_transcript(
+                "Unprocessed Events",
+                "project: test",
+                "🧠 [memory event]: something important",
+            )
+            count = self._run(
+                self._hook(d, entries),
+                {"NTFY_URL": "http://ntfy.example.com", "NTFY_TOPIC": "test"},
+                notify=True,
+            )
+            assert count == 1
+
+    def test_t3_41_ntfy_not_called_when_all_events_processed(self):
+        with tempfile.TemporaryDirectory() as d:
+            entries = basic_transcript(
+                "Processed Events",
+                "project: test",
+                "🧠 [memory event]: something\n🔁 [remember processed]",
+            )
+            count = self._run(
+                self._hook(d, entries),
+                {"NTFY_URL": "http://ntfy.example.com", "NTFY_TOPIC": "test"},
+                notify=True,
+            )
+            assert count == 0
+
+    def test_t3_42_ntfy_skipped_silently_when_url_not_set(self):
+        with tempfile.TemporaryDirectory() as d:
+            entries = basic_transcript(
+                "No URL Session",
+                "project: test",
+                "🧠 [memory event]: something important",
+            )
+            count = self._run(self._hook(d, entries), {}, notify=True)
+            assert count == 0
 
 
 # --- Smoke test ---

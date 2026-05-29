@@ -16,11 +16,21 @@ Claude Code supports hooks that execute shell commands at specific lifecycle eve
 | `inject-corrections.py`     | First message   | `_self/corrections.md` — corrections and known failure modes that persist across sessions   | All      |
 | `inject-context-claude.py`  | First message   | Detected project's `CLAUDE.md` — matched from project name in your first message            | Tier 1   |
 | `inject-context-memory.py`  | First message   | Detected project's `_memory.md` — current state, open questions, key decisions              | Tier 1   |
+| `inject-context-projects.py` | First message  | All active project paths + snapshot lines — vault-wide project registry                     | All      |
 | `inject-context-project.py` *(planned)* | First message   | Same as above but detected via Qdrant embedding; falls back to keyword match                | Tier 2/3 |
 | `inject-context-rag.py`     | Every turn      | Relevant note titles (Qdrant top-3); full content for 📖 markers from previous turn         | Tier 2/3 |
 | `save-conversation.py`      | Stop/SessionEnd | Saves transcript to `_conversations/YYYY/MM/` with YAML frontmatter including event markers | All      |
 
 For component interfaces and data flows, see [second-brain-setup/architecture.md — Claude Code interface](../personal/projects/second-brain-setup/architecture.md#claude-code-interface).
+
+### Active project registry
+
+`inject-context-projects.py` injects a compact `## Active Projects` block on the first turn of every conversation. It scans `personal/`, `professional/`, and `public/projects/` and extracts the `## Snapshot` one-liner from each project's `_memory.md`. Projects without a snapshot are listed by path only.
+
+This means Claude always knows what projects exist in your vault without you having to name them. New projects appear automatically the next conversation after their folder is created — no configuration needed.
+
+**Budget:** ~60–80 chars per project; well within the 10,000-char limit for typical vault sizes.
+**Tier:** All (no external dependencies — stdlib only).
 
 ### RAG failure notification
 
@@ -53,6 +63,8 @@ The budget for this system:
 | `UserPromptSubmit` #2 | `inject-corrections.py`    | 8,000 chars | 10,000 chars |
 | `UserPromptSubmit` #3 | `inject-context-claude.py` | 8,000 chars | 10,000 chars |
 | `UserPromptSubmit` #4 | `inject-context-memory.py` | 8,000 chars | 10,000 chars |
+| `UserPromptSubmit` #5 | `inject-context-rag.py`    | n/a (titles only) | 10,000 chars |
+| `UserPromptSubmit` #6 | `inject-context-projects.py` | n/a (generated inline) | 10,000 chars |
 
 Each script has its own independent budget — splitting files into separate hooks gives each a full 9,500-char limit instead of sharing one budget.
 

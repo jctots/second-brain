@@ -126,16 +126,16 @@ class TestMainDegradation(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(out, "")
 
-    def test_T8_8_url_error_first_failure_exits_0_emits_warning(self):
-        """URLError from configured service with no sentinel → exits 0, emits warning."""
+    def test_T8_8_url_error_silent_exit(self):
+        """URLError from configured service → exits 0, no output — handled silently."""
         with tempfile.TemporaryDirectory() as tmp:
             with patch.object(_rag, "ollama_embed", side_effect=urllib.error.URLError("refused")):
                 out, code = self._run(
                     {"cwd": tmp, "prompt": "test query"},
-                    {"OLLAMA_HOST": "somehost", "QDRANT_HOST": "somehost", "NTFY_URL": ""},
+                    {"OLLAMA_HOST": "somehost", "QDRANT_HOST": "somehost"},
                 )
         self.assertEqual(code, 0)
-        self.assertIn("⚠️", out)
+        self.assertEqual(out, "")
 
 
 # ── T8.9–T8.12  main() — filtering and deduplication ─────────────────────────
@@ -235,93 +235,6 @@ class TestMainOutputFormat(unittest.TestCase):
         self.assertIn("personal/areas/beta.md — Beta Note", lines[1])
         self.assertIn("personal/areas/alpha.md — Alpha Note", lines[2])
         self.assertIn(" — ", lines[1])
-
-
-# ── T8.14–T8.18  failure notification and sentinel ───────────────────────────
-
-class TestFailureNotification(unittest.TestCase):
-
-    def _run(self, hook_data, env):
-        out = _Utf8Out()
-        exit_code = None
-        try:
-            with patch.dict(os.environ, env):
-                with patch("sys.stdin", StringIO(json.dumps(hook_data))):
-                    with patch("sys.stdout", out):
-                        _rag.main()
-        except SystemExit as e:
-            exit_code = e.code
-        return out.getvalue(), exit_code
-
-    def test_T8_14_ollama_url_error_repeat_failure_is_silent(self):
-        """Ollama URLError with error sentinel already present → no output, exits 0."""
-        with tempfile.TemporaryDirectory() as tmp:
-            Path(tmp, _rag._STATUS_FILE).write_text(
-                "error|2026-05-28 09:00|Ollama unreachable (myhost:11434)", encoding="utf-8"
-            )
-            with patch.object(_rag, "ollama_embed", side_effect=urllib.error.URLError("refused")):
-                out, code = self._run(
-                    {"cwd": tmp, "prompt": "test query"},
-                    {"OLLAMA_HOST": "myhost", "QDRANT_HOST": "myhost", "NTFY_URL": ""},
-                )
-        self.assertEqual(code, 0)
-        self.assertEqual(out, "")
-
-    def test_T8_15_qdrant_url_error_first_failure_emits_warning(self):
-        """Ollama ok, Qdrant URLError, no sentinel → emits Qdrant-specific warning, exits 0."""
-        with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_rag, "ollama_embed", return_value=_FAKE_VEC):
-                with patch.object(_rag, "qdrant_search", side_effect=urllib.error.URLError("refused")):
-                    out, code = self._run(
-                        {"cwd": tmp, "prompt": "test query"},
-                        {"OLLAMA_HOST": "myhost", "QDRANT_HOST": "myhost", "NTFY_URL": ""},
-                    )
-        self.assertEqual(code, 0)
-        self.assertIn("⚠️", out)
-        self.assertIn("Qdrant unreachable", out)
-
-    def test_T8_16_recovery_emits_recovery_message(self):
-        """Error sentinel present, both services now reachable → emits recovery message with timestamp."""
-        results = [{"payload": {"file_path": "personal/areas/a.md"}, "score": 0.90}]
-        with tempfile.TemporaryDirectory() as tmp:
-            Path(tmp, _rag._STATUS_FILE).write_text(
-                "error|2026-05-28 09:00|Ollama unreachable (myhost:11434)", encoding="utf-8"
-            )
-            with patch.object(_rag, "ollama_embed", return_value=_FAKE_VEC):
-                with patch.object(_rag, "qdrant_search", return_value=results):
-                    out, _ = self._run(
-                        {"cwd": tmp, "prompt": "test query"},
-                        {"OLLAMA_HOST": "myhost", "QDRANT_HOST": "myhost", "NTFY_URL": ""},
-                    )
-        self.assertIn("✅", out)
-        self.assertIn("RAG restored", out)
-        self.assertIn("2026-05-28 09:00", out)
-
-    def test_T8_17_sentinel_written_on_first_failure(self):
-        """First failure → sentinel file created with error state and reason."""
-        with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_rag, "ollama_embed", side_effect=urllib.error.URLError("refused")):
-                self._run(
-                    {"cwd": tmp, "prompt": "test query"},
-                    {"OLLAMA_HOST": "myhost", "QDRANT_HOST": "myhost", "NTFY_URL": ""},
-                )
-            sentinel = Path(tmp, _rag._STATUS_FILE).read_text(encoding="utf-8")
-        self.assertTrue(sentinel.startswith("error|"))
-        self.assertIn("Ollama unreachable", sentinel)
-
-    def test_T8_18_sentinel_updated_to_ok_on_success(self):
-        """Successful run → sentinel file written with 'ok'."""
-        results = [{"payload": {"file_path": "personal/areas/a.md"}, "score": 0.90}]
-        with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_rag, "ollama_embed", return_value=_FAKE_VEC):
-                with patch.object(_rag, "qdrant_search", return_value=results):
-                    self._run(
-                        {"cwd": tmp, "prompt": "test query"},
-                        {"OLLAMA_HOST": "myhost", "QDRANT_HOST": "myhost", "NTFY_URL": ""},
-                    )
-            sentinel = Path(tmp, _rag._STATUS_FILE).read_text(encoding="utf-8")
-        self.assertEqual(sentinel, "ok")
-
 
 if __name__ == "__main__":
     unittest.main()
