@@ -19,7 +19,26 @@ Save context from the current conversation to persistent storage. Execute in ord
 
 5. **Update `## Snapshot` and `## Next Actions` in-place** — if the project's status or next actions have materially changed this session, update the `## Snapshot` text and `## Next Actions` list directly using Edit. Both sections are always current-state, never appended to. Write plain bullets in `## Next Actions` — no emoji prefix.
 
-6. **Review `## Next Actions` items** — if the list has items, first close any that were clearly completed this session (no prompt needed, edit the file directly). Then, if items remain, generate a **handover prompt** — a copy-pastable block the user can paste at the start of the next session to continue. Include a one-liner summary of what was accomplished this session, then list the open items. Format as a fenced code block:
+6. **Identify and close completed `## Next Actions` items** — identify any items that were clearly completed this session. Remove each from `_memory.md` (Edit, no prompt needed). Keep a list of the removed titles for step 8.
+
+7. **Sync to Vikunja** — requires Vikunja MCP configured (`.mcp.json` at project root). Attempt the MCP call; if it fails (MCP unavailable, auth error, network), skip this step and note the failure. Otherwise:
+   a. Determine the Vikunja project name from the vault project folder slug (e.g. `home-lab-infrastructure`).
+   b. Check whether a Vikunja project with that name exists. If not, create it.
+   c. Fetch all open tasks from that Vikunja project.
+   d. For each item currently in `## Next Actions`: if no open Vikunja task with a matching title exists, create one.
+   e. For each title removed in step 6: close the matching open Vikunja task.
+
+8. **Emit processed markers** — output on separate lines, only for what was actually written:
+   - `🔁 [remember processed]` only if `_memory.md` was written
+   - `🪪 [profile processed]` only if a `_self/` file was written
+   - `📋 [task processed]` only if task-relevant content was captured
+
+9. **Budget check** — run `wc -m {files-written}` to get character counts for every file written this session. If any file exceeds 8,000 chars, emit one line per offending file:
+    `⚠️ {relative-path} is {N} chars — over 8,000 warn threshold; run /maintain option 5`
+
+10. Briefly confirm what was written and what was skipped (one line per file).
+
+11. **Generate handover prompt** — if items remain in `## Next Actions` after step 6, generate a copy-pastable block the user can paste at the start of the next session. Include a one-liner summary of what was accomplished this session, then list the open items. Format as a fenced code block:
 
    ```
    project: <project-name>
@@ -32,14 +51,5 @@ Save context from the current conversation to persistent storage. Execute in ord
    ...
    ```
 
-   Display the handover prompt and stop — do not close or modify the remaining items. They will be handled in the session where the handover prompt is used. Skip this step entirely if `## Next Actions` is empty after auto-closing completed items.
+   Display the handover prompt and stop — do not close or modify the remaining items. They will be handled in the session where the handover prompt is used. Skip step 7 entirely if `## Next Actions` is empty after step 6.
 
-7. **Emit processed markers** — output on separate lines, only for what was actually written:
-   - `🔁 [remember processed]` only if `_memory.md` was written
-   - `🪪 [profile processed]` only if a `_self/` file was written
-   - `📋 [task processed]` only if task-relevant content was captured
-
-8. **Budget check** — run `wc -m {files-written}` to get character counts for every file written this session. If any file exceeds 8,000 chars, emit one line per offending file:
-   `⚠️ {relative-path} is {N} chars — over 8,000 warn threshold; run /maintain option 4`
-
-9. Briefly confirm what was written and what was skipped (one line per file).

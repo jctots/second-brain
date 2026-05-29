@@ -68,6 +68,19 @@ Tier 1 is the fastest path to get started. Tier 2/3 is the path when data privac
 
 See [docs/getting-started.md](docs/getting-started.md) for setup and [PRIVACY.md](PRIVACY.md) for data handling at each tier.
 
+## ➕ Optional services
+
+Optional services layer on top of any tier — configure what you need, skip what you don't. All configure via `.env` and degrade gracefully when absent.
+
+| Service | What it adds | Tier |
+|---|---|---|
+| RAG (Ollama + Qdrant) | Semantic search; passive note surfacing during sessions | 2/3 |
+| ntfy | Push notifications — CI failures, service health, unprocessed events | Any |
+| Vikunja | Task sync — next actions from memory files synced to a task board | Any |
+| LiteLLM | Local LLM inference — routes Claude Code to a private Ollama instance | 2/3 |
+
+See [docs/configuration.md](docs/configuration.md) for setup instructions and all configuration variables.
+
 ## ⚡ Slash commands
 
 Invoked by typing `/command-name` in a Claude Code session. Defined as Markdown files in `.claude/commands/` — no registration required.

@@ -46,6 +46,14 @@
             "command": "python _scripts/inject-context-rag.py"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python _scripts/inject-context-projects.py"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -63,7 +71,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python _scripts/save-conversation.py"
+            "command": "python _scripts/save-conversation.py --notify"
           }
         ]
       }

@@ -1,5 +1,4 @@
-# Setup script for Windows.
-# Reads _infrastructure/stack.yaml and ensures the correct Python version and VS Code extensions are installed.
+# Ensures Python is installed, then delegates to setup.py.
 # Run from repo root: .\_scripts\setup.ps1
 
 $ErrorActionPreference = "Stop"
@@ -51,29 +50,4 @@ if ($needInstall) {
     }
 }
 
-# --- pip dependencies ---
-Write-Host "Installing pip dependencies..."
-& $python.Source -m pip install --quiet -r "$repoRoot\_scripts\requirements.txt"
-
-# --- VS Code extensions ---
-$codeCmd = Get-Command code -ErrorAction SilentlyContinue
-if ($codeCmd) {
-    Write-Host "Installing VS Code extensions..."
-    $inExtensions = $false
-    foreach ($line in (Get-Content $infra)) {
-        if ($line -match '^\s+extensions:') { $inExtensions = $true; continue }
-        if ($inExtensions) {
-            if ($line -match '^\s+-\s+(\S+)') {
-                $ext = $Matches[1]
-                Write-Host "  Installing extension: $ext"
-                & code --install-extension $ext --force 2>$null
-            } elseif ($line -match '^\S' -or ($line -match '^\s+\S' -and $line -notmatch '^\s+-')) {
-                $inExtensions = $false
-            }
-        }
-    }
-} else {
-    Write-Host "VS Code (code) not in PATH — skipping extension install."
-}
-
-Write-Host "Setup complete."
+& $python.Source "$repoRoot\_scripts\setup.py"

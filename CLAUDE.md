@@ -135,6 +135,8 @@ Example: _"This looks like `personal/projects/health-tracking`. Should I load th
 
 When project names are mentioned in the first message, `_scripts/inject-context.py` automatically injects their `CLAUDE.md` and `_memory.md` into the context window. If a project was mentioned but its context was not injected (hook miss or later message), search for it at `{personal,professional,public}/projects/{name}/` — not with a filename glob.
 
+**Project registry:** `inject-context-projects.py` injects a `## Active Projects` block on the first turn listing every project path and its snapshot line. Use this to recognize project references, suggest related projects, and understand the full scope of active work — without asking the user to enumerate their projects.
+
 **Hook verification:** At the start of every conversation, state in one line which project context files were loaded, e.g.: _"Loaded: `personal/projects/second-brain-setup/CLAUDE.md` + `_memory.md`"_. If no project context was injected, say so. This lets you verify hook status without asking.
 
 ## How to help me

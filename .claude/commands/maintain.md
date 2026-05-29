@@ -3,13 +3,14 @@ Vault health audit.
 Ask the user which operation:
 
 **(1) Generate artifacts** — run scripts locally, same as CI
-**(2) Inbox processing** — route inbox items to the right PARA location
-**(3) Event processing** — surface and process missed events from past conversations
-**(4) Memory maintenance** — condense AI-maintained files that have grown large
-**(5) Resource note maintenance** — deduplicate and cross-link resource notes
-**(6) Documentation maintenance** — consistency check across implementation, SE docs, and README
-**(7) Roadmap maintenance** — research landscape, prune implemented items, update limitations-and-roadmap.md
-**(8) Reports** — automated scans, findings only, no edits
+**(2) Service sync** — pull task state from Vikunja and reconcile `## Next Actions` across all active projects
+**(3) Inbox processing** — route inbox items to the right PARA location
+**(4) Event processing** — surface and process missed events from past conversations
+**(5) Memory maintenance** — condense AI-maintained files that have grown large
+**(6) Resource note maintenance** — deduplicate and cross-link resource notes
+**(7) Documentation maintenance** — consistency check across implementation, SE docs, and README
+**(8) Roadmap maintenance** — research landscape, prune implemented items, update limitations-and-roadmap.md
+**(9) Reports** — automated scans, findings only, no edits
 
 ---
 
@@ -26,7 +27,23 @@ Report: what was regenerated and budget output summary.
 
 ---
 
-## Option 2 — Inbox processing
+## Option 2 — Service sync
+
+Pull task state from Vikunja and reconcile `## Next Actions` across all active projects. Requires Vikunja MCP configured (`.mcp.json` at project root). Attempt the MCP call; if it fails, report and stop.
+
+1. Read all active project paths from the `## Active Projects` context block. Extract the folder name (last path segment) for each — this is the Vikunja project name.
+
+2. For each project: query Vikunja for all tasks in the project matching the folder name. Separate into open and closed.
+
+3. For each project `_memory.md`:
+   - Closed Vikunja tasks matching an entry in `## Next Actions` → remove directly.
+   - Open Vikunja tasks not found in `## Next Actions` → add directly.
+
+4. Write all changes and report: removed (completed on Vikunja), added (Vikunja-only), no-change.
+
+---
+
+## Option 3 — Inbox processing
 
 Route items out of `_inbox/`. One file at a time — wait for confirmation before moving to the next.
 
@@ -44,7 +61,7 @@ Route items out of `_inbox/`. One file at a time — wait for confirmation befor
 
 ---
 
-## Option 3 — Event processing
+## Option 4 — Event processing
 
 1. Read `_conversations/pending-events.md`. If empty or missing, report no pending events and stop.
 
@@ -62,7 +79,7 @@ Route items out of `_inbox/`. One file at a time — wait for confirmation befor
 
 ---
 
-## Option 4 — Memory maintenance
+## Option 5 — Memory maintenance
 
 Exceptional maintenance for AI-maintained files that have grown large with genuine content. Propose changes — apply only with user confirmation. Target file size after consolidation: ≤ 5,000 chars.
 
@@ -84,7 +101,7 @@ Exceptional maintenance for AI-maintained files that have grown large with genui
 
 ---
 
-## Option 5 — Resource note maintenance
+## Option 6 — Resource note maintenance
 
 Use Qdrant via `rag-search.py` to find overlapping notes without loading all resource content into context. Propose changes — apply only with user confirmation. Always use Edit, never Write.
 
@@ -102,7 +119,7 @@ Use Qdrant via `rag-search.py` to find overlapping notes without loading all res
 
 ---
 
-## Option 6 — Documentation maintenance
+## Option 7 — Documentation maintenance
 
 Consistency check in three cascading layers. Each layer only runs if the previous layer produced changes.
 
@@ -172,7 +189,7 @@ Same pattern: surface each inconsistency, ask implementation vs. documentation, 
 
 ---
 
-## Option 7 — Roadmap maintenance
+## Option 8 — Roadmap maintenance
 
 Research the PKM + AI landscape, prune implemented items, and update `docs/limitations-and-roadmap.md`. Propose all changes — apply only with user confirmation. Always use Edit, never Write (unless adding a net-new roadmap item that doesn't exist yet).
 
@@ -196,7 +213,7 @@ Research the PKM + AI landscape, prune implemented items, and update `docs/limit
 
 ---
 
-## Option 8 — Reports
+## Option 9 — Reports
 
 Run all checks and report findings. No edits.
 
