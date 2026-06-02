@@ -16,15 +16,19 @@ jobs:
           git config user.email "actions@gitea"
 
       - name: Generate conversation index
+        id: conv_index
         run: python3 _scripts/generate-conversation-index.py
 
       - name: Generate project indexes
+        id: proj_indexes
         run: python3 _scripts/generate-project-indices.py
 
       - name: Generate dashboard
+        id: dashboard
         run: python3 _scripts/generate-dashboard.py
 
       - name: Generate pending events
+        id: pending_events
         run: python3 _scripts/generate-pending-events.py
 
       - name: Cache pip packages
@@ -34,6 +38,7 @@ jobs:
           key: pip-pdf-pdfplumber-pytesseract
 
       - name: Generate PDF sidecars
+        id: pdf_sidecars
         if: ${{ vars.PDF_SIDECARS_ENABLED == 'true' }}
         run: |
           apt-get update && apt-get install -y tesseract-ocr
@@ -42,6 +47,7 @@ jobs:
           /tmp/pdf-venv/bin/python3 _scripts/generate-pdf-sidecars.py
 
       - name: Commit artifacts
+        id: commit
         run: |
           git add _conversations/index.md _conversations/pending-events.md personal/ professional/ public/ dashboard.md
           git ls-files --others --exclude-standard | grep '\.md$' | xargs -r git add || true
@@ -53,7 +59,14 @@ jobs:
       - name: Notify failure
         if: failure() && secrets.NTFY_URL != ''
         run: |
+          FAILED_STEP=""
+          [[ "${{ steps.conv_index.outcome }}"    == "failure" ]] && FAILED_STEP="Generate conversation index"
+          [[ "${{ steps.proj_indexes.outcome }}"  == "failure" ]] && FAILED_STEP="Generate project indexes"
+          [[ "${{ steps.dashboard.outcome }}"     == "failure" ]] && FAILED_STEP="Generate dashboard"
+          [[ "${{ steps.pending_events.outcome }}" == "failure" ]] && FAILED_STEP="Generate pending events"
+          [[ "${{ steps.pdf_sidecars.outcome }}"  == "failure" ]] && FAILED_STEP="Generate PDF sidecars"
+          [[ "${{ steps.commit.outcome }}"        == "failure" ]] && FAILED_STEP="Commit artifacts"
           curl -s \
             -H "Title: Second Brain CI failure" \
-            -d "❌ ${{ github.workflow }} failed on ${{ github.ref_name }} — ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}" \
+            -d "❌ ${FAILED_STEP} failed on ${{ github.ref_name }} — ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}" \
             ${{ secrets.NTFY_URL }}/${{ secrets.NTFY_TOPIC }}
