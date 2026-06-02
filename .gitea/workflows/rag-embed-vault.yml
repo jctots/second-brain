@@ -22,7 +22,9 @@ jobs:
           git clone "https://oauth2:${{ secrets.GITEA_TOKEN }}@${SERVER}/${{ gitea.repository }}.git" .
 
       - name: Embed changed / remove deleted
+        id: embed
         run: |
+          exec > >(tee /tmp/ci_output.txt) 2>&1
           if [ "${{ gitea.event_name }}" = "workflow_dispatch" ]; then
             echo "Manual trigger — full vault re-index."
             python3 _scripts/rag-embed.py
@@ -47,7 +49,14 @@ jobs:
       - name: Notify failure
         if: failure() && secrets.NTFY_URL != ''
         run: |
+          OUTPUT=$(head -c 100 /tmp/ci_output.txt 2>/dev/null || echo "(no output captured)")
           curl -s \
             -H "Title: Second Brain CI failure" \
-            -d "❌ ${{ github.workflow }} failed on ${{ github.ref_name }} — ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}" \
-            ${{ secrets.NTFY_URL }}/${{ secrets.NTFY_TOPIC }}
+            --data-binary @- \
+            "${{ secrets.NTFY_URL }}/${{ secrets.NTFY_TOPIC }}" <<EOF
+          ❌ RAG embed failed on ${{ github.ref_name }}
+
+          ${OUTPUT}
+
+          ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}
+          EOF

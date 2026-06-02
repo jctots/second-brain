@@ -3,7 +3,7 @@ Vault health audit.
 Ask the user which operation:
 
 **(1) Generate artifacts** — run scripts locally, same as CI
-**(2) Service sync** — pull task state from Vikunja and reconcile `## Next Actions` across all active projects
+**(2) Tasks sync** — pull task state from Vikunja and reconcile `## Next Actions` across all active projects
 **(3) Inbox processing** — route inbox items to the right PARA location
 **(4) Event processing** — surface and process missed events from past conversations
 **(5) Memory maintenance** — condense AI-maintained files that have grown large
@@ -33,7 +33,7 @@ Pull task state from Vikunja and reconcile `## Next Actions` across all active p
 
 1. Read all active project paths from the `## Active Projects` context block. Extract the folder name (last path segment) for each — this is the Vikunja project name.
 
-2. For each project: query Vikunja for all tasks in the project matching the folder name. Separate into open and closed.
+2. For each project: query Vikunja for all tasks in the project matching the folder name. Separate into open and closed. Always query fresh — do not reuse task results from an earlier `/remember` or `/maintain` run in the same session, as the user may have closed tasks in between.
 
 3. For each project `_memory.md`:
    - Closed Vikunja tasks matching an entry in `## Next Actions` → remove directly.
@@ -68,8 +68,8 @@ Route items out of `_inbox/`. One file at a time — wait for confirmation befor
 2. For each pending conversation, one at a time:
    a. Read the conversation file.
    b. Find all 🧠, 👤, 🗂️, and ✅ marker lines and their descriptions.
-   c. For 🧠 and ✅ markers: process as `/remember` would — append a `<!-- remembered: YYYY-MM-DD -->` block to the project `_memory.md` using Edit.
-   d. For 👤 markers: route to `_self/` — behavioral corrections, feedback rules, or recurring failures with a Claude-side prevention → `_self/corrections.md`; profile facts → `_self/about.md`; user-side observations (failure or self-awareness, no Claude action) → `_self/reflection.md`. Append a `<!-- remembered: YYYY-MM-DD -->` block using Edit.
+   c. For 🧠 and ✅ markers: process as `/remember` step 2 would — merge new facts into `_memory.md` in-place using Edit. No append blocks.
+   d. For 👤 markers: route to `_self/` — behavioral corrections, feedback rules, or recurring failures with a Claude-side prevention → `_self/corrections.md`; profile facts → `_self/about.md`; user-side observations (failure or self-awareness, no Claude action) → `_self/reflection.md`. Merge in-place using Edit. No append blocks.
    e. For 🗂️ markers: process as `/distill` would — draft note, show proposed path and content, wait for user confirmation before writing.
    f. On completion: update the conversation file's `processed` frontmatter field using Edit to reflect what was actioned. Token names: `memory` (🧠), `profile` (👤), `distill` (🗂️), `task` (✅) — all match their event type exactly.
 

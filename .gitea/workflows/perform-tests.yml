@@ -16,33 +16,57 @@ jobs:
           git clone "https://oauth2:${{ secrets.GITEA_TOKEN }}@${SERVER}/${{ gitea.repository }}.git" .
 
       - name: T1 — Hook injection budget
-        run: python3 _tests/test_hook_budget.py
+        id: t1
+        run: python3 _tests/test_hook_budget.py 2>&1 | tee /tmp/ci_output.txt; exit ${PIPESTATUS[0]}
 
       - name: T2 — Inject hooks
-        run: python3 _tests/test_inject_hooks.py
+        id: t2
+        run: python3 _tests/test_inject_hooks.py 2>&1 | tee /tmp/ci_output.txt; exit ${PIPESTATUS[0]}
 
       - name: T3 — Save conversation
-        run: python3 _tests/test_save_conversation.py
+        id: t3
+        run: python3 _tests/test_save_conversation.py 2>&1 | tee /tmp/ci_output.txt; exit ${PIPESTATUS[0]}
 
       - name: T4 — Generate pending events
-        run: python3 _tests/test_generate_pending_events.py
+        id: t4
+        run: python3 _tests/test_generate_pending_events.py 2>&1 | tee /tmp/ci_output.txt; exit ${PIPESTATUS[0]}
 
       - name: T5 — Generate dashboard
-        run: python3 _tests/test_generate_dashboard.py
+        id: t5
+        run: python3 _tests/test_generate_dashboard.py 2>&1 | tee /tmp/ci_output.txt; exit ${PIPESTATUS[0]}
 
       - name: T6 — RAG embed
-        run: python3 _tests/test_rag_embed.py
+        id: t6
+        run: python3 _tests/test_rag_embed.py 2>&1 | tee /tmp/ci_output.txt; exit ${PIPESTATUS[0]}
 
       - name: T7 — RAG search
-        run: python3 _tests/test_rag_search.py
+        id: t7
+        run: python3 _tests/test_rag_search.py 2>&1 | tee /tmp/ci_output.txt; exit ${PIPESTATUS[0]}
 
       - name: T8 — Inject context RAG
-        run: python3 _tests/test_inject_context_rag.py
+        id: t8
+        run: python3 _tests/test_inject_context_rag.py 2>&1 | tee /tmp/ci_output.txt; exit ${PIPESTATUS[0]}
 
       - name: Notify failure
         if: failure() && secrets.NTFY_URL != ''
         run: |
+          FAILED_STEP=""
+          [[ "${{ steps.t1.outcome }}" == "failure" ]] && FAILED_STEP="T1 Hook injection budget"
+          [[ "${{ steps.t2.outcome }}" == "failure" ]] && FAILED_STEP="T2 Inject hooks"
+          [[ "${{ steps.t3.outcome }}" == "failure" ]] && FAILED_STEP="T3 Save conversation"
+          [[ "${{ steps.t4.outcome }}" == "failure" ]] && FAILED_STEP="T4 Generate pending events"
+          [[ "${{ steps.t5.outcome }}" == "failure" ]] && FAILED_STEP="T5 Generate dashboard"
+          [[ "${{ steps.t6.outcome }}" == "failure" ]] && FAILED_STEP="T6 RAG embed"
+          [[ "${{ steps.t7.outcome }}" == "failure" ]] && FAILED_STEP="T7 RAG search"
+          [[ "${{ steps.t8.outcome }}" == "failure" ]] && FAILED_STEP="T8 Inject context RAG"
+          OUTPUT=$(head -c 100 /tmp/ci_output.txt 2>/dev/null || echo "(no output captured)")
           curl -s \
             -H "Title: Second Brain CI failure" \
-            -d "❌ ${{ github.workflow }} failed on ${{ github.ref_name }} — ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}" \
-            ${{ secrets.NTFY_URL }}/${{ secrets.NTFY_TOPIC }}
+            --data-binary @- \
+            "${{ secrets.NTFY_URL }}/${{ secrets.NTFY_TOPIC }}" <<EOF
+          ❌ ${FAILED_STEP} failed on ${{ github.ref_name }}
+
+          ${OUTPUT}
+
+          ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}
+          EOF
