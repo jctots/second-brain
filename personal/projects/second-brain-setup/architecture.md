@@ -22,6 +22,7 @@ created: 2026-04-29
 | A2 | Gitea Actions workflows | CI owns derived artifacts; local hooks only block bad commits | [§ A2](#a2--gitea-actions-workflows) |
 | A3 | Hook guarantee | If a behavior must happen every session without fail, it needs a hook — instructions are not guaranteed | [§ Claude Code interface](#claude-code-interface) |
 | A4 | RAG degrades to nothing | RAG is an enhancement, not a dependency — all invocation points exit cleanly when services are unavailable or unconfigured | [§ RAG pipeline](#rag-pipeline) |
+| A5 | Optional services degrade gracefully | All optional services (Vikunja, ntfy, LiteLLM, RAG) configure via `.env` and fail silently when absent — core functionality works at Tier 1 without any of them | [§ Optional services](#optional-services) |
 
 ---
 
@@ -48,6 +49,10 @@ created: 2026-04-29
   - [Auto-memory](#auto-memory)
   - [Slash commands](#slash-commands)
   - [Automation reliability summary](#automation-reliability-summary)
+- [Optional services](#optional-services)
+  - [Setup](#setup)
+  - [Vikunja (task sync)](#vikunja-task-sync)
+  - [ntfy (notifications)](#ntfy-notifications)
 - [LiteLLM gateway interface](#litellm-gateway-interface)
   - [What it is](#what-it-is)
   - [Configuration](#configuration)
@@ -180,13 +185,16 @@ Python scripts callable both from Claude Code hooks and Gitea Actions CI. No ext
 
 | Script | Called by | Purpose |
 |---|---|---|
+| `_hook_utils.py` | Shared library (imported by all hook scripts) | `is_first_turn`, `load_dotenv`, `get_first_user_message`, `get_ide_opened_file`, `find_project_from_file`, `strip_ide_selection`, `find_projects_in_message`, `CONTEXTS`. Not a hook itself — no stdin, no output. |
 | `inject-profile.py` | Hook (`UserPromptSubmit`) | Inject `_self/about.md` summary |
 | `inject-corrections.py` | Hook (`UserPromptSubmit`) | Inject `_self/corrections.md` summary |
 | `inject-context-claude.py` | Hook (`UserPromptSubmit`) | Detect project, inject project `CLAUDE.md` |
 | `inject-context-memory.py` | Hook (`UserPromptSubmit`) | Detect project, inject project `_memory.md` |
 | `inject-context-project.py` *(planned)* | Hook (`UserPromptSubmit`) | Detect project via Qdrant embedding (Tier 2/3) or keyword match (Tier 1 fallback); inject project `CLAUDE.md` + `_memory.md` — replaces `inject-context-claude.py` + `inject-context-memory.py` on Tier 2/3 |
+| `inject-context-projects.py` | Hook (`UserPromptSubmit`) | Scan all active projects in `{personal,professional,public}/projects/`, extract `## Snapshot` from each `_memory.md`, inject compact `## Active Projects` registry. First turn only. No external dependencies. |
 | `inject-context-rag.py` | Hook (`UserPromptSubmit`) | Embed user message via Ollama, query Qdrant top-3 above similarity threshold, inject matching note titles + file paths. Fires every turn. Degrades gracefully — exits 0 with no output when RAG is unconfigured or unreachable. |
 | `save-conversation.py` | Hook (`Stop`, `SessionEnd`) | Save session transcript to `_conversations/`; scan for event markers; write `events`/`processed` frontmatter |
+| `check-health.py` | Hook (`UserPromptSubmit`) | Check reachability of configured optional services (Ollama, Qdrant, Vikunja, Gitea, ntfy). First turn only. Silent on success; prints failures to conversation context. Reads `.env`. No external deps (stdlib only). |
 | `generate-conversation-index.py` | CI (`generate-artifacts.yml`), `/maintain` | Regenerate `_conversations/index.md` |
 | `generate-project-indices.py` | CI (`generate-artifacts.yml`), `/maintain` | Regenerate `## files`, `## relevant conversations`, and `## quick status` in each project `index.md` |
 | `generate-dashboard.py` | CI (`generate-artifacts.yml`), `/maintain` | Regenerate `dashboard.md` — `## active projects` table (quick status) + context TOC (resources grouped by cluster tags) |
@@ -202,14 +210,17 @@ Python scripts callable both from Claude Code hooks and Gitea Actions CI. No ext
 ### Session start
 
 ```
-User opens VSCode → types first message
+User types first message
   → UserPromptSubmit hook fires (guaranteed, every turn)
-      inject-profile.py         → _self/about.md → prepended to context     (first turn)
-      inject-corrections.py           → _self/corrections.md → prepended to context     (first turn)
-      inject-context-claude.py  → project CLAUDE.md → prepended to context  (first turn)
-      inject-context-memory.py  → project _memory.md → prepended to context (first turn)
-      inject-context-rag.py     → queries Qdrant, injects matching note titles (every turn;
-                                   silent if RAG unavailable)
+      inject-profile.py         → _self/about.md → prepended to context          (first turn)
+      inject-corrections.py     → _self/corrections.md → prepended to context    (first turn)
+      inject-context-claude.py  → project CLAUDE.md → prepended to context       (first turn)
+      inject-context-memory.py  → project _memory.md → prepended to context      (first turn)
+      inject-context-projects.py → ## Active Projects registry (all projects)     (first turn)
+      check-health.py           → service reachability check; prints failures     (first turn;
+                                    silent if all services are healthy)
+      inject-context-rag.py     → queries Qdrant, injects matching note titles   (every turn;
+                                    silent if RAG unavailable)
   → Claude sees: hooks output + user message + root CLAUDE.md
 ```
 
@@ -412,6 +423,16 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 
 ---
 
+#### Active project registry (`UserPromptSubmit`)
+
+**File:** `_scripts/inject-context-projects.py`
+**Fires on:** Every `UserPromptSubmit`, self-limits to first turn only
+**What it does:** Scans all `{personal,professional,public}/projects/*/` directories. For each project, reads the `## Snapshot` one-liner from `_memory.md` (if present). Injects a `## Active Projects` block listing every project path and its snapshot, giving Claude vault-wide project awareness at conversation start.
+**Budget:** ~60–80 chars per project; well within limits for typical vault sizes.
+**Tier:** All (no external dependencies).
+
+---
+
 ### A1 — Memory capture model
 *→ Distilled: [[personal/resources/ai-memory-capture-judgment-pass]]*
 
@@ -539,7 +560,7 @@ Adding a new command: create `.claude/commands/{name}.md`. No registration requi
 
 | Behavior | Mechanism | Reliability |
 |---|---|---|
-| Save conversation to `_conversations/` | Hook (`Stop` + `SessionEnd`) | Guaranteed |
+| Save conversation to `_conversations/` + ntfy if events pending | Hook (`Stop` + `SessionEnd`) | Guaranteed — ntfy skipped if `NTFY_URL` not set |
 | Load `_self/about.md` at session start | Hook (`inject-profile.py`) | Guaranteed — first turn only |
 | Load `_self/corrections.md` at session start | Hook (`inject-corrections.py`) | Guaranteed — first turn only |
 | Load project `CLAUDE.md` | Hook (`inject-context-claude.py`) | Guaranteed if project name in first message |
@@ -552,7 +573,58 @@ Adding a new command: create `.claude/commands/{name}.md`. No registration requi
 | `/distill` trigger | User-invoked slash command | Reliable — user-triggered; cross-session |
 | `/maintain` trigger | User-invoked slash command | Reliable — user-triggered; periodic |
 | RAG passive surfacing (Tier 2/3) | Hook (`inject-context-rag.py`, `UserPromptSubmit`) | Every turn; exits 0 with no output if Qdrant or Ollama is unreachable |
+| Service health check (session start) | Hook (`check-health.py`, `UserPromptSubmit`) | Fires on first turn of every session; silent if all services are healthy |
 | Project context injection via RAG (Tier 2/3) | Hook (`inject-context-project.py`, `UserPromptSubmit`) | Guaranteed first turn if Qdrant + Ollama reachable; keyword fallback to Tier 1 |
+
+---
+
+## Optional services
+
+All optional services implement A5: configured via `.env` (written by `setup.py`), they degrade gracefully when absent or unreachable. Core vault functionality — editing, context injection, event capture, CI artifacts — works at Tier 1 without any optional service.
+
+---
+
+### Setup
+
+`_scripts/setup.py` is the interactive configuration entry point. Run it once after cloning:
+
+```
+python _scripts/setup.py
+```
+
+Each service has a detection key (an env var in `.env`). If the key is already set, the service is shown as configured. Reconfigure any time by selecting it again.
+
+| Service | Detection key | What it enables | Tier |
+|---|---|---|---|
+| RAG (Ollama + Qdrant) | `OLLAMA_HOST` | Semantic search, passive note surfacing | 2/3 |
+| ntfy | `NTFY_URL` | Push notifications (CI failures, service health) | Any |
+| Vikunja | `VIKUNJA_URL` | Task sync (`/remember` step 6, `/maintain` option 2) | Any |
+| LiteLLM | — (manual) | Local LLM inference path | 2/3 |
+
+---
+
+### Vikunja (task sync)
+
+**What it does:** `/remember` step 6 syncs `## Next Actions` from `_memory.md` to Vikunja (creates project and tasks if missing). `/maintain` option 2 pulls closed Vikunja tasks and removes matching entries from `## Next Actions`. Design principle: Vikunja is the source of truth; `_memory.md` is the cached display.
+
+**Configuration:** `VIKUNJA_URL` (base URL, no `/api/v1`) + `VIKUNJA_TOKEN` (API token with unlimited scope). `setup.py` writes both to `.env` and creates `.mcp.json` at vault root (gitignored — contains the token). MCP package: `vikunja-mcp` (installed by `setup.py` via pip).
+
+**Degradation:** if MCP is unavailable or Vikunja is unreachable, `/remember` and `/maintain` skip the sync step and report the failure.
+
+---
+
+### ntfy (notifications)
+
+**What it does:** Push notifications to a self-hosted or hosted [ntfy](https://ntfy.sh) server. Two invocation points:
+
+- `save-conversation.py` (Stop hook): after saving a session, sends a notification if the conversation has unprocessed events (events emitted but `/remember` not run).
+- CI workflows (`generate-artifacts.yml`, `perform-tests.yml`, `rag-embed-vault.yml`): sends a notification on workflow failure.
+
+Service health failures surface in the conversation via `check-health.py` (UserPromptSubmit hook, first turn) — not via ntfy, since the user is at the desktop.
+
+**Configuration:** `NTFY_URL` (server base URL) + `NTFY_TOPIC` (topic name). CI uses the same topic via Gitea secrets (`NTFY_URL`, `NTFY_TOPIC`). HTTP `Title` header must be ASCII — emoji belong in the message body only.
+
+**Degradation:** all callers wrap ntfy in `try/except Exception: pass` — if the server is unreachable or unconfigured, the notification is silently skipped and the calling action proceeds normally.
 
 ---
 
@@ -883,6 +955,7 @@ Three levels. Each serves a different reader.
 | Privacy / data handling | `PRIVACY.md` | — |
 | Known limitations or roadmap | `docs/limitations-and-roadmap.md` | — |
 | Deployment tier detail | `docs/getting-started.md` | `docs/private-cloud-setup.md` or `docs/self-hosted-setup.md` |
+| Optional service setup or configuration | `docs/configuration.md` | `architecture.md` § Optional services |
 | Repo layout or contribution workflow | `CONTRIBUTING.md` | — |
 | System architecture or component interfaces | `architecture.md` (this file) | — |
 | System requirements | `requirements.md` | — |

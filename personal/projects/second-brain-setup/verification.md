@@ -7,14 +7,16 @@ Scenarios are identified as **T#.#** — first number is the test file, second i
 | T# | File | Covers |
 |---|---|---|
 | T1 | `test_hook_budget.py` | Hook injection budget enforcement |
-| T2 | `test_inject_hooks.py` | `inject-profile.py`, `inject-corrections.py`, `inject-context-claude.py`, `inject-context-memory.py` |
+| T2 | `test_inject_hooks.py` | `inject-profile.py`, `inject-corrections.py`, `inject-context-claude.py`, `inject-context-memory.py`; utility functions via `_hook_utils.py` |
 | T3 | `test_save_conversation.py` | `save-conversation.py` |
 | T4 | `test_generate_pending_events.py` | `generate-pending-events.py` |
 | T5 | `test_generate_dashboard.py` | `generate-dashboard.py` — resource/area collection, snapshot parsing (incl. next actions), tag pages, system health block |
 | T6 | `test_rag_embed.py` | `rag-embed.py` — point ID stability, skip logic, chunking contracts, graceful degradation |
 | T7 | `test_rag_search.py` | `rag-search.py` — graceful degradation (not configured, services down, happy path) |
-| T8 | `test_inject_context_rag.py` | `inject-context-rag.py` — H1 extraction (frontmatter state machine, stem fallback), graceful degradation, failure notification and sentinel, threshold filtering, deduplication, output format |
+| T8 | `test_inject_context_rag.py` | `inject-context-rag.py` — H1 extraction (frontmatter state machine, stem fallback), graceful degradation, threshold filtering, deduplication, output format |
 | T9 | `test_generate_project_indices.py` | `generate-project-indices.py` — subfolder index generation (auto-create, skip conditions, backlink format) |
+| T10 | `test_inject_context_projects.py` | `inject-context-projects.py` — active project registry injection (snapshot extraction, collect_projects, main output format and turn guard) |
+| T11 | `test_check_health.py` | `check-health.py` — first-turn gate, silent when unconfigured, per-service unreachable warnings |
 
 Fixtures are created in `tempfile.TemporaryDirectory` per test and cleaned up after. Smoke tests run against the real vault (Gitea CI — full content available).
 
@@ -194,6 +196,9 @@ This is a health check script, not a unit test file. It runs against the real va
 | T3.37 | Transcript has no `ai-title` entry | Exits 0, no file written | R11 |
 | T3.38 | `_conversations/` directory does not exist in `cwd` | Exits 0, no file written — prevents writing to wrong repo root | R11 |
 | T3.39 | Transcript has messages but zero text segments | Frontmatter written, body effectively empty — no crash | R11 |
+| T3.40 | Transcript has unprocessed events, `NTFY_URL` set | ntfy called with title `"Second Brain: events pending"` and pending event types in body | R11 |
+| T3.41 | All events processed (`events` == `processed`) | ntfy not called — no unprocessed events | R11 |
+| T3.42 | Transcript has unprocessed events, `NTFY_URL` not set | No ntfy call, no crash — degrades gracefully | R11 |
 
 ---
 
@@ -380,7 +385,7 @@ Health signals are sourced from: `_conversations/pending-events.md` (event count
 | T8.5 | `OLLAMA_HOST` not set | Exits 0, no output; `ollama_embed` never called | R12 |
 | T8.6 | `QDRANT_HOST` not set | Exits 0, no output; `ollama_embed` never called | R12 |
 | T8.7 | `prompt` field is empty or whitespace | Exits 0, no output | R12 |
-| T8.8 | `OLLAMA_HOST` set, `ollama_embed` raises `URLError`, no sentinel present | Exits 0; emits ⚠️ warning naming the service and address | R12 |
+| T8.8 | `OLLAMA_HOST` set, `ollama_embed` raises `URLError` | Exits 0, no output — URLError handled silently | R12 |
 
 ### `main()` — filtering and deduplication
 
@@ -397,18 +402,6 @@ Health signals are sourced from: `_conversations/pending-events.md` (event count
 |---|---|---|---|
 | T8.13 | Two results above threshold with known files | Output is exactly `## Relevant vault notes\n- {path} — {title}` per result; em dash and spacing correct; highest-score file first | R11 |
 
-### `main()` — failure notification and sentinel
-
-Sentinel file `.rag-status` in the vault root tracks RAG availability across turns. Format: `ok` or `error\|TIMESTAMP\|REASON` (pipe-delimited to avoid ambiguity with colons in timestamps). Only first-failure and recovery transitions produce output — repeat failures in the same error state are silent.
-
-| # | Scenario | Expected | Req |
-|---|---|---|---|
-| T8.14 | Ollama URLError, sentinel already present with error state | Exits 0, no output — repeat failure suppressed | R12 |
-| T8.15 | Ollama ok, Qdrant URLError, no sentinel present | Exits 0; emits ⚠️ warning naming Qdrant and its address | R12 |
-| T8.16 | Error sentinel present, both services now reachable | Emits ✅ recovery message including the error timestamp from the sentinel | R12 |
-| T8.17 | First failure (no sentinel) | Sentinel file created; content starts with `error\|` and includes reason string | R12 |
-| T8.18 | Successful run | Sentinel file written with content `ok` | R12 |
-
 ---
 
 ## T9 — `test_generate_project_indices.py`
@@ -424,6 +417,64 @@ Subdirectories within a project that contain `.md` files but have no `index.md` 
 | T9.3 | Subdir name starts with `_` | Skipped — no `index.md` generated, not linked from parent | R4 |
 | T9.4 | Subdir has no `.md` files | Not treated as content subdir — no `index.md` generated | R7 |
 | T9.5 | Generated stub | Contains backlink `[[{project}/index\|⬅️ {project}]]` pointing to project root | R7 |
+
+---
+
+## T10 — `test_inject_context_projects.py`
+
+### `extract_snapshot(memory_path)`
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T10.1 | `_memory.md` has `## Snapshot` with text | Returns snapshot text | R11 |
+| T10.2 | `_memory.md` has no `## Snapshot` section | Returns `None` — no crash | R11 |
+| T10.3 | File does not exist | Returns `None` — no crash | R11 |
+| T10.4 | `## Snapshot` present but empty (next `##` heading follows immediately) | Returns `None` | R11 |
+
+### `collect_projects(cwd)`
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T10.5 | Project with `_memory.md` and `## Snapshot` | Entry includes path + snapshot text | R11 |
+| T10.6 | Project with no `_memory.md` | Entry included with snapshot `None` — project still listed | R11 |
+| T10.7 | Projects in multiple contexts | All contexts scanned; personal/ before professional/ | R11 |
+| T10.8 | No `projects/` directory in any context | Returns `[]` — no crash | R11 |
+| T10.9 | Directory starting with `.` under `projects/` | Skipped — not included in results | R11 |
+
+### `main()`
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T10.10 | First turn, projects exist | Output starts with `## Active Projects`, exits 0 | R11 |
+| T10.11 | Second turn (assistant entry in transcript) | Exits 0, no output | R11 |
+| T10.12 | Project with snapshot | Em dash separator: `- {path} — {snapshot}` | R11 |
+| T10.13 | Project with no `_memory.md` | Listed as `- {path}` (no em dash, no snapshot) | R11 |
+| T10.14 | stdin is empty | Exits 0, no output | R11 |
+| T10.15 | No project directories in vault | Exits 0, no output | R11 |
+
+---
+
+## T11 — `test_check_health.py`
+
+### `main()` — gate behaviour
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T11.1 | stdin is empty | Exits 0, no output | R11 |
+| T11.2 | stdin is invalid JSON | Exits 0, no output | R11 |
+| T11.3 | Second turn (assistant entry in transcript) | Exits 0, no output | R11 |
+| T11.4 | First turn, no services configured (all env vars empty) | Exits 0, no output — silent | R11 |
+
+### `main()` — service reachability
+
+Uses `127.0.0.1:19999` (closed port) with `RAG_TIMEOUT=1` for fast failure.
+
+| # | Scenario | Expected | Req |
+|---|---|---|---|
+| T11.5 | First turn, Vikunja configured but unreachable | Exits 0; output contains `⚠️ Service check:` and `Vikunja unreachable` | R11 |
+| T11.6 | First turn, Gitea configured but unreachable | Exits 0; output contains `Gitea unreachable` | R11 |
+| T11.7 | First turn, ntfy configured but unreachable | Exits 0; output contains `ntfy unreachable` | R11 |
+| T11.8 | First turn, Vikunja + Gitea both unreachable | Both named in single warning line | R11 |
 
 ---
 
@@ -444,3 +495,4 @@ Subdirectories within a project that contain `.md` files but have no `index.md` 
 | `rag-search.py` (no `.env`, no env vars) | Exits 0; prints "RAG not configured" — no network calls | R5 |
 | `inject-context-rag.py` (live services, `.env` configured) | Exits 0 with a real prompt; if results exist, output starts with `## Relevant vault notes` | R12 |
 | `inject-context-rag.py` (no `.env`, no env vars) | Exits 0; no output — not configured path | R12 |
+| `inject-context-projects.py` | Exits 0; output contains `## Active Projects` and at least one `- {path}` entry | R11 |
