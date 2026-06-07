@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""T2 — Tests for inject-profile.py, inject-corrections.py, inject-context-claude.py, inject-context-memory.py"""
+"""T2 — Tests for inject-profile.py, inject-corrections.py, inject-context-claude.py, inject-context-memory.py.
+Utility functions (is_first_turn, get_first_user_message, etc.) live in _hook_utils.py and are tested here
+via the inject scripts that import them."""
 import importlib.util
 import json
 import subprocess

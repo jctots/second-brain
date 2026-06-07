@@ -54,6 +54,14 @@
             "command": "python _scripts/inject-context-projects.py"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python _scripts/check-health.py"
+          }
+        ]
       }
     ],
     "Stop": [

@@ -27,8 +27,12 @@ Save context from the current conversation to persistent storage.
    a. Find or create the Vikunja project matching the vault folder slug (e.g.
       `home-lab-infrastructure`).
    b. Fetch all tasks (open and done) from that project.
-   c. **Vikunja → memory:** Remove from `## Next Actions` any item whose
-      matching Vikunja task is marked done. Add those titles to the removed list.
+   c. **Vikunja → memory:** Vikunja is the source of truth for the task list.
+      - Add to `## Next Actions` any open Vikunja task that has no matching
+        entry there yet (copy the Vikunja title verbatim; append `— Vikunja #N`
+        if an ID is not already present in the title).
+      - Remove from `## Next Actions` any item whose matching Vikunja task is
+        marked done. Add those titles to the removed list.
    d. **Memory → Vikunja (close):** Close the matching Vikunja task for each
       title in the removed list.
    e. **Memory → Vikunja (create):** Call `batch_create_tasks` in one call for

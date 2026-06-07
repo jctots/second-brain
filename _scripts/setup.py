@@ -156,7 +156,6 @@ SERVICES: list[dict] = [
             ("NTFY_URL", "ntfy server URL (e.g. https://your-ntfy-host)", ""),
             ("NTFY_TOPIC", "ntfy topic (used for all notifications)", "second-brain"),
             ("NTFY_ON_EVENTS", "Notify on unprocessed session events (true/false)", "true"),
-            ("NTFY_ON_HEALTH", "Notify on service/budget health failures (true/false)", "true"),
         ],
         "tips": {
             "NTFY_URL": "CI failure notifications use Gitea secrets (NTFY_URL, NTFY_TOPIC) — set those separately in Gitea → Settings → Secrets.",
@@ -430,19 +429,17 @@ def _cfg_hook_budget() -> None:
 def _cfg_ntfy_toggles() -> None:
     env = read_env()
     current_events = env.get("NTFY_ON_EVENTS", "true")
-    current_health = env.get("NTFY_ON_HEALTH", "true")
 
     print()
     print(f"  NTFY_ON_EVENTS (session events): {current_events}")
-    print(f"  NTFY_ON_HEALTH (health check):   {current_health}")
     print()
     print("  Note: CI failure notifications are controlled via Gitea secrets (NTFY_URL, NTFY_TOPIC),")
     print("  not .env — toggle them by adding or removing those secrets in Gitea.")
+    print("  Service health failures are shown in-conversation, not via ntfy.")
     print()
 
     try:
         new_events = input(f"  NTFY_ON_EVENTS [current: {current_events}] (true/false, Enter to keep): ").strip().lower()
-        new_health = input(f"  NTFY_ON_HEALTH [current: {current_health}] (true/false, Enter to keep): ").strip().lower()
     except (KeyboardInterrupt, EOFError):
         print("\n  Skipped.")
         return
@@ -450,8 +447,6 @@ def _cfg_ntfy_toggles() -> None:
     updates: dict[str, str] = {}
     if new_events in ("true", "false"):
         updates["NTFY_ON_EVENTS"] = new_events
-    if new_health in ("true", "false"):
-        updates["NTFY_ON_HEALTH"] = new_health
 
     if updates:
         write_env(updates)

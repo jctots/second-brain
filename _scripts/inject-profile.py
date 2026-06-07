@@ -7,21 +7,8 @@ from pathlib import Path
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout = open(sys.stdout.fileno(), mode="w", encoding="utf-8", buffering=1)
 
-
-def is_first_turn(transcript_path: str) -> bool:
-    path = Path(transcript_path)
-    if not path.exists():
-        return True
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            entry = json.loads(line)
-            if entry.get("type") == "assistant":
-                return False
-        except json.JSONDecodeError:
-            continue
-    return True
+sys.path.insert(0, str(Path(__file__).parent))
+from _hook_utils import is_first_turn  # noqa: E402
 
 
 def main():
@@ -42,7 +29,7 @@ def main():
     about_path = cwd / "_self/about.md"
     if about_path.exists():
         content = about_path.read_text(encoding="utf-8")
-        print(f"The following is JC's profile and behavioral context, loaded automatically at session start:\n\n{content}")
+        print(f"The following is the user profile and behavioral context, loaded automatically at session start:\n\n{content}")
 
 
 if __name__ == "__main__":

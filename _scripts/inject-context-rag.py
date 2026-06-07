@@ -12,6 +12,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from _hook_utils import load_dotenv  # noqa: E402
+
 _DEFAULTS = {
     "RAG_COLLECTION": "second_brain",
     "RAG_EMBED_MODEL": "embeddinggemma:latest",
@@ -20,19 +23,6 @@ _DEFAULTS = {
     "RAG_SCORE_THRESHOLD": "0.30",
     "RAG_TIMEOUT": "5",
 }
-
-
-# ── env ───────────────────────────────────────────────────────────────────────
-
-def load_dotenv(root: Path) -> None:
-    env_file = root / ".env"
-    if not env_file.exists():
-        return
-    for line in env_file.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            k, _, v = line.partition("=")
-            os.environ.setdefault(k.strip(), v.strip())
 
 
 # ── Ollama ────────────────────────────────────────────────────────────────────

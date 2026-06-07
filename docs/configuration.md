@@ -39,18 +39,19 @@ RAG tuning variables (edit `.env` directly):
 
 ### ntfy
 
-Push notifications for session events, health check failures, and CI failures.
+Push notifications for session events and CI failures.
 
 | Variable | Default | Notes |
 |---|---|---|
 | `NTFY_URL` | (none) | ntfy server base URL — notifications disabled if empty |
 | `NTFY_TOPIC` | `second-brain` | Topic name used for all notifications |
 | `NTFY_ON_EVENTS` | `true` | Notify on unprocessed session events |
-| `NTFY_ON_HEALTH` | `true` | Notify on service/budget health failures |
 
 For CI failure notifications: add `NTFY_URL` and `NTFY_TOPIC` as Gitea secrets (Settings → Secrets). CI reads from Gitea secrets, not `.env`.
 
-Toggle `NTFY_ON_EVENTS` and `NTFY_ON_HEALTH` via setup.py option 3 → ntfy events, or edit `.env` directly.
+Toggle `NTFY_ON_EVENTS` via setup.py option 3 → ntfy events, or edit `.env` directly.
+
+Service health failures are reported in-conversation (via `check-health.py` UserPromptSubmit hook), not via ntfy.
 
 ### Vikunja
 
@@ -62,6 +63,17 @@ Task sync — `/remember` writes next actions to a Vikunja project; `/maintain` 
 | `VIKUNJA_TOKEN` | API token — Vikunja: Settings → API Tokens → create with unlimited scope |
 
 `setup.py` also creates `.mcp.json` at vault root (gitignored) and installs `vikunja-mcp` via pip. Restart Claude Code after configuring for MCP to take effect.
+
+### Gitea
+
+Service health check — `check-health.py` verifies Gitea is reachable at session start.
+
+| Variable | Notes |
+|---|---|
+| `GITEA_URL` | Base URL of your Gitea instance (e.g. `https://git.example.com`) |
+| `GITEA_TOKEN` | Personal access token — Gitea: Settings → Applications → Generate token |
+
+Add both to `.env` manually. If either is absent, the Gitea check is skipped.
 
 ### LiteLLM
 
@@ -96,7 +108,7 @@ Controls when files in `_self/` and project `CLAUDE.md`/`_memory.md` trigger war
 | `HOOK_BUDGET_HARD` | `10000` | Hard char limit per file — CI fails above this |
 | `HOOK_BUDGET_WARN_PCT` | `80` | Warn threshold as % of the hard limit |
 
-Affects: `test_hook_budget.py` (CI and `check-health.py`), `generate-dashboard.py` (budget section in dashboard).
+Affects: `test_hook_budget.py` (CI), `generate-dashboard.py` (budget section in dashboard).
 
 ### 3.3 ntfy events
 
@@ -105,9 +117,10 @@ Toggle which local notification points are active. Run `setup.py` → option 3 �
 | Variable | Default | Effect when `false` |
 |---|---|---|
 | `NTFY_ON_EVENTS` | `true` | Session-end notifications silenced |
-| `NTFY_ON_HEALTH` | `true` | Startup health-check notifications silenced |
 
-Setting either to `false` does not affect CI notifications — those are controlled by whether Gitea secrets `NTFY_URL` and `NTFY_TOPIC` are set.
+Setting to `false` does not affect CI notifications — those are controlled by whether Gitea secrets `NTFY_URL` and `NTFY_TOPIC` are set.
+
+Service health failures are always shown in-conversation (first turn of each session) regardless of this setting.
 
 ### 3.4 Git remotes
 
