@@ -91,11 +91,12 @@ Exceptional maintenance for AI-maintained files that have grown large with genui
 
 2. **Project memory consolidation** — for each active project with a large `_memory.md`:
    - Route aging content: key decisions → create `decisions/D{n}-{slug}.md` and add a row to `decisions/index.md` (newest first)
-   - stable reference → skip or note for `/distill`
+   - stable reference (config, deployment details, inventories, URLs) → move to `reference.md` or the project-equivalent stable doc (`architecture.md`, `requirements.md`, etc.)
+   - cross-project generalizable insight → flag as a `/distill` candidate (creates a resource note; removes from `_memory.md`)
    - superseded items → delete
 
 3. **Next Actions staleness audit** — surface implied next actions not yet captured in `## Next Actions`. For each active project:
-   a. Read `_memory.md` — scan `## Current Status` and `## Open questions` for anything that implies a pending action not already listed in `## Next Actions`.
+   a. Read `_memory.md` — scan `## Working Context` and `## Open questions` for anything that implies a pending action not already listed in `## Next Actions`.
    b. Read `_conversations/pending-events.md` — find any unprocessed ✅ markers for this project that haven't been captured as Next Actions.
    c. Propose additions as plain bullets. Show proposed additions grouped by project and wait for user confirmation before writing to `_memory.md`.
 

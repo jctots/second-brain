@@ -10,7 +10,7 @@ This second brain uses the **PARA method** across **three contexts**:
 | --------------- | --------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `personal/`     | Self and family | Private — life, health, finances, family    | Treat all content as private. **Default context** — use unless there is a reason to choose otherwise.                                   |
 | `professional/` | Professional    | Private — career, current job, clients      | Treat all content as private. For current employer / company work only — not job search or CV (those live in `personal/`).              |
-| `public/`       | Anyone          | Shareable — open source, writing, learning  | Content may eventually be published — write with a reader in mind. Do not embed personal details, employer names, or private decisions. Use only when content is intended for sharing or publishing — not merely because it isn't sensitive. |
+| `public/`       | Open source / public repos | Private — the vault content is private; the project itself is public | Treat all content as private. Use for projects that have a corresponding public GitHub/open-source repository. The context indicates where and how the project is shared, not that vault notes are publishable. |
 
 Each context has the same PARA structure:
 
@@ -123,7 +123,20 @@ Each active project folder may contain a `_memory.md` file — a running log of 
 
 **Trigger:** Run `/remember` at the end of any conversation. Steps are defined in `.claude/commands/remember.md`.
 
-**Project memory sections:** `## Snapshot` holds a one-liner project state — accurate for days or weeks, not tied to a specific pending action. `## Next Actions` lists meaningful project actions only — no git ops, no `/remember`, no housekeeping; plain bullets. `## Current Status` holds the longer narrative loaded for context injection.
+**Project memory sections:** `## Snapshot` holds a one-liner project state — accurate for days or weeks, not tied to a specific pending action. `## Next Actions` lists meaningful project actions only — no git ops, no `/remember`, no housekeeping; plain bullets. `## Working Context` holds the one-paragraph working state loaded for context injection — replaced each session, not accumulated.
+
+**Content taxonomy — what belongs where:**
+
+| Content | Home | Signal to move |
+|---|---|---|
+| Current-session state, open questions | `_memory.md ## Working Context` | — |
+| Next actions | `_memory.md` → Vikunja | — |
+| Recent decisions (≤ ~8) | `_memory.md ## Key decisions` | — |
+| Mature decisions (> ~8 bullets) | `decisions/index.md` | Section getting long |
+| Stable reference (config, URLs, inventories) | `reference.md` or project equivalent | Content stops changing |
+| Component inventory, architecture | `architecture.md` | reference.md has distinct structure section |
+| Cross-project generalizable insight | `resources/` via `/distill` | Useful beyond this project |
+| Prior-session status paragraphs | Git history (delete from `_memory.md`) | On each `/remember` |
 
 **Reminder:** At the end of each working session, if 🧠, 🗂️, or ✅ event markers were emitted during the conversation and `/remember` or `/distill` has not been run, remind the user: _"Events were captured this session — run `/remember` and/or `/distill` to process them."_
 
@@ -163,6 +176,7 @@ Format: `🧠 [memory event]: one-line description`
 Format: `👤 [profile event]: one-line description`
 
 **🗂️ `[distill event]`** — lasting reference value beyond this project: technology analysis, tool comparisons, design patterns, architectural concepts, mental models. Does not trigger for project-specific decisions or ephemeral details.
+Detection test: *"Would this apply to a different project or context?"* If yes, emit. Trigger signals: a framework or process introduced (audit structure, evaluation method), a principle stated (threat model before hardening), a split or pattern named (private vault vs. public artifact), a tool comparison, or an architectural mental model. Emit immediately when the insight appears — do not wait for end of turn.
 Format: `🗂️ [distill event]: one-line description`
 
 **✅ `[task event]`** — concrete next action identified for the user. Visual signal only — not routed by `/remember`; use judgment to include task-relevant content in the `_memory.md` block.
@@ -189,4 +203,4 @@ These markers are scanned by `save-conversation.py` and written to the conversat
 
 ## Hook injection budget
 
-Each injected file (`_self/about.md`, `_self/corrections.md`, project `CLAUDE.md`, project `_memory.md`) has a 10,000-char hard limit. `/remember` consolidates new content into existing sections in-place — no raw append blocks. `/maintain` option 4 handles files that have grown large over time.
+Each injected file (`_self/about.md`, `_self/corrections.md`, project `CLAUDE.md`, project `_memory.md`) has a 10,000-char hard limit. `/remember` consolidates new content into existing sections in-place — no raw append blocks. `/maintain` option 5 handles files that have grown large over time.
