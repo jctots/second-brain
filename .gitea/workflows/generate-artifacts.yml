@@ -68,5 +68,5 @@ jobs:
           [[ "${{ steps.commit.outcome }}"        == "failure" ]] && FAILED_STEP="Commit artifacts"
           curl -s \
             -H "Title: Second Brain CI failure" \
-            -d "❌ ${FAILED_STEP} failed on ${{ github.ref_name }} — ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}" \
+            -d "❌ ${FAILED_STEP} failed on ${{ github.ref_name }} — ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_number }}" \
             ${{ secrets.NTFY_URL }}/${{ secrets.NTFY_TOPIC }}

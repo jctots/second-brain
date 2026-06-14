@@ -18,7 +18,8 @@ On /remember, Claude updates each section in-place — never appends new blocks.
 
 ## Snapshot
 
-<!-- One-line summary of project state — accurate for days or weeks. Updated by /remember. -->
+<!-- One line. Read by inject-context-projects.py for the Active Projects registry.
+     Accurate for days or weeks. Format: {milestone/version} — {one-phrase state}. -->
 One-line summary of where this project stands right now
 
 ## Next Actions
@@ -27,8 +28,11 @@ One-line summary of where this project stands right now
 - First next action
 - Second next action
 
-## Current Status
+## Working Context
 
+<!-- One paragraph. Read at session start as working context for Claude. Replace (not accumulate) on each /remember.
+     Covers: active state, repo/version, what changed this session.
+     Stable reference (config, URLs, inventories) → reference.md. Prior-session detail → git history. -->
 Brief description of where this project stands right now.
 
 ## Key decisions

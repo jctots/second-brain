@@ -58,5 +58,5 @@ jobs:
 
           ${OUTPUT}
 
-          ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}
+          ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_number }}
           EOF

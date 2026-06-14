@@ -47,6 +47,18 @@ jobs:
         id: t8
         run: python3 _tests/test_inject_context_rag.py 2>&1 | tee /tmp/ci_output.txt; exit ${PIPESTATUS[0]}
 
+      - name: T9 — Generate project indices
+        id: t9
+        run: python3 _tests/test_generate_project_indices.py 2>&1 | tee /tmp/ci_output.txt; exit ${PIPESTATUS[0]}
+
+      - name: T10 — Inject context projects
+        id: t10
+        run: python3 _tests/test_inject_context_projects.py 2>&1 | tee /tmp/ci_output.txt; exit ${PIPESTATUS[0]}
+
+      - name: T11 — Check health
+        id: t11
+        run: python3 _tests/test_check_health.py 2>&1 | tee /tmp/ci_output.txt; exit ${PIPESTATUS[0]}
+
       - name: Notify failure
         if: failure() && secrets.NTFY_URL != ''
         run: |
@@ -59,7 +71,14 @@ jobs:
           [[ "${{ steps.t6.outcome }}" == "failure" ]] && FAILED_STEP="T6 RAG embed"
           [[ "${{ steps.t7.outcome }}" == "failure" ]] && FAILED_STEP="T7 RAG search"
           [[ "${{ steps.t8.outcome }}" == "failure" ]] && FAILED_STEP="T8 Inject context RAG"
-          OUTPUT=$(head -c 100 /tmp/ci_output.txt 2>/dev/null || echo "(no output captured)")
+          [[ "${{ steps.t9.outcome }}" == "failure" ]] && FAILED_STEP="T9 Generate project indices"
+          [[ "${{ steps.t10.outcome }}" == "failure" ]] && FAILED_STEP="T10 Inject context projects"
+          [[ "${{ steps.t11.outcome }}" == "failure" ]] && FAILED_STEP="T11 Check health"
+          if [[ "${{ steps.t1.outcome }}" == "failure" ]]; then
+            OUTPUT=$(grep -E "^(FAIL|WARN)" /tmp/ci_output.txt 2>/dev/null || echo "(no output captured)")
+          else
+            OUTPUT=$(head -c 100 /tmp/ci_output.txt 2>/dev/null || echo "(no output captured)")
+          fi
           curl -s \
             -H "Title: Second Brain CI failure" \
             --data-binary @- \
@@ -68,5 +87,5 @@ jobs:
 
           ${OUTPUT}
 
-          ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }}
+          ${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_number }}
           EOF
