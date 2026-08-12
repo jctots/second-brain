@@ -12,8 +12,6 @@ Claude Code supports hooks that execute shell commands at specific lifecycle eve
 
 | Hook                        | Event           | Injects                                                                                     | Tier     |
 | --------------------------- | --------------- | ------------------------------------------------------------------------------------------- | -------- |
-| `inject-profile.py`         | First message   | `_self/about.md` — your profile and behavioral reflection                                   | All      |
-| `inject-corrections.py`     | First message   | `_self/corrections.md` — corrections and known failure modes that persist across sessions   | All      |
 | `inject-context-claude.py`  | First message   | Detected project's `CLAUDE.md` — matched from project name in your first message            | Tier 1   |
 | `inject-context-memory.py`  | First message   | Detected project's `_memory.md` — current state, open questions, key decisions              | Tier 1   |
 | `inject-context-projects.py` | First message  | All active project paths + snapshot lines — vault-wide project registry                     | All      |
@@ -23,13 +21,32 @@ Claude Code supports hooks that execute shell commands at specific lifecycle eve
 
 For component interfaces and data flows, see [second-brain-setup/architecture.md — Claude Code interface](../personal/projects/second-brain-setup/architecture.md#claude-code-interface).
 
+### Profile and corrections: `@` imports, not hooks
+
+`_self/about.md` and `_self/corrections.md` are loaded by two `@` import lines at the top of the root `CLAUDE.md`:
+
+```markdown
+@_self/about.md
+@_self/corrections.md
+```
+
+They are not hooks, and that difference matters in three ways:
+
+- **No character cap.** Hook output is capped at 10,000 chars per invocation. Imports are not.
+- **They survive `/compact`.** Hook output is a one-time injection into the first turn — after a compaction it is gone and does not come back. Imported files are part of the memory block and are re-sent every request.
+- **Always loaded, not conditionally.** There is no first-turn detection and no project matching to miss.
+
+The trade-off is that the content is in *every* request rather than just the first, so size is a running token cost instead of a one-off. `_tests/test_hook_budget.py` still measures both files and warns, but no longer fails the build on them.
+
+A missing import is silently skipped by Claude Code — no warning, no error, and the session starts normally. So a fresh clone with an empty `_self/` works; it just has no profile loaded. `setup.py` seeds both files from `_templates/about-template.md` and `_templates/corrections-template.md` on first run.
+
 ### Active project registry
 
 `inject-context-projects.py` injects a compact `## Active Projects` block on the first turn of every conversation. It scans `personal/`, `professional/`, and `public/projects/` and extracts the `## Snapshot` one-liner from each project's `_memory.md`. Projects without a snapshot are listed by path only.
 
 This means Claude always knows what projects exist in your vault without you having to name them. New projects appear automatically the next conversation after their folder is created — no configuration needed.
 
-**Budget:** ~60–80 chars per project; well within the 10,000-char limit for typical vault sizes.
+**Budget:** ~60–80 chars per project; well within this hook's stdout cap for typical vault sizes.
 **Tier:** All (no external dependencies — stdlib only).
 
 ### RAG failure notification
@@ -53,26 +70,42 @@ State is tracked in `.rag-status` in the vault root (gitignored). Format: `ok` o
 
 ## 💰 Context injection budget
 
-Claude Code caps all hook output at **10,000 characters per hook**. Content beyond that is silently truncated and replaced with a file reference — there's no warning, and Claude won't notice it happened.
+Claude Code caps a hook's output at **10,000 characters — per hook invocation, not per file.** One hook writes one stdout, so a turn that matches several projects puts every matched file under a single shared cap. Content beyond the cap is written to a file and replaced by a short preview, which drops the rest.
 
-The budget for this system:
+Each script gets its own independent cap, which is why the injectors are split into separate hook entries rather than one script. But splitting buys nothing *within* a script: `inject-context-memory.py` reading three projects' `_memory.md` still has one 10,000-char budget to spend across all three.
 
-| Hook                  | Script                     | Warn at     | Hard limit   |
-| --------------------- | -------------------------- | ----------- | ------------ |
-| `UserPromptSubmit` #1 | `inject-profile.py`        | 8,000 chars | 10,000 chars |
-| `UserPromptSubmit` #2 | `inject-corrections.py`    | 8,000 chars | 10,000 chars |
-| `UserPromptSubmit` #3 | `inject-context-claude.py` | 8,000 chars | 10,000 chars |
-| `UserPromptSubmit` #4 | `inject-context-memory.py` | 8,000 chars | 10,000 chars |
-| `UserPromptSubmit` #5 | `inject-context-rag.py`    | n/a (titles only) | 10,000 chars |
-| `UserPromptSubmit` #6 | `inject-context-projects.py` | n/a (generated inline) | 10,000 chars |
+Two thresholds handle this, both set in `.env`:
 
-Each script has its own independent budget — splitting files into separate hooks gives each a full 9,500-char limit instead of sharing one budget.
+| Variable | Default | Role |
+|---|---|---|
+| `HOOK_OUTPUT_CAP` | `9800` | **Runtime.** Sits just under the harness cap. Enforced inside the injectors |
+| `HOOK_BUDGET_HARD` | `9000` | **Maintenance target.** Checked by CI. Headroom, not a hard stop |
+| `HOOK_BUDGET_WARN_PCT` | `80` | Warn threshold as a percentage of `HOOK_BUDGET_HARD` |
+
+A file may exceed `HOOK_BUDGET_HARD` and still inject fine. It is a signal to trim, not a failure of the mechanism.
+
+| Hook                  | Script                     | Injects                                  |
+| --------------------- | -------------------------- | ---------------------------------------- |
+| `UserPromptSubmit` #1 | `inject-context-claude.py` | project `CLAUDE.md` — one per matched project |
+| `UserPromptSubmit` #2 | `inject-context-memory.py` | project `_memory.md` — one per matched project |
+| `UserPromptSubmit` #3 | `inject-context-rag.py`    | note titles (and 📖-flagged bodies)      |
+| `UserPromptSubmit` #4 | `inject-context-projects.py` | one snapshot line per project           |
+
+`_self/about.md` and `_self/corrections.md` are not in this table — they are `@` imports and carry no cap.
+
+### What happens on overflow
+
+Not silent truncation. `_hook_utils.emit_capped()` fills the budget with full file bodies and degrades whatever no longer fits to a one-line pointer telling Claude to read the file itself:
+
+> _`_memory.md` for `my-project` did not fit the hook budget — read `personal/projects/my-project/_memory.md` before working on it._
+
+So overflow costs you an extra read, and it is visible in the conversation. The `_self/` injectors do the same for a single oversized file, pointing at `/maintain` option 5.
 
 ### Budget enforcement
 
-The 10,000-char limit is enforced by CI:
-
-- **CI** — [`_tests/test_hook_budget.py`](../_tests/test_hook_budget.py) runs on every push to `main` and fails the build if any file exceeds 10,000 chars.
+- **CI** — [`_tests/test_hook_budget.py`](../_tests/test_hook_budget.py) runs on every push to `main` and fails the build if any hook-injected file exceeds `HOOK_BUDGET_HARD` (default 9,000). The `_self/` imports are measured and warned on, but never fail the build.
+- The test measures `len(label) + len(file)`, because each injector prepends a label line that also counts against the cap. A file measured alone can pass and still overflow live.
+- The multi-project case is not enumerable in CI — that is what the runtime cap and `emit_capped()` cover.
 
 ### Verifying hook health
 

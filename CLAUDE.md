@@ -2,6 +2,9 @@
 
 [[dashboard|⬅️ Dashboard]]
 
+@_self/about.md
+@_self/corrections.md
+
 ## System Overview
 
 This second brain uses the **PARA method** across **three contexts**:
@@ -155,7 +158,7 @@ When project names are mentioned in the first message, `_scripts/inject-context.
 ## How to help me
 
 - When I share a note, help me place it in the right context and PARA category
-- `_self/about.md`, `_self/corrections.md`, and project context files are auto-injected by hook on the first turn — no need to re-read them unless the hook missed something
+- `_self/about.md` and `_self/corrections.md` are loaded as `@` imports at the top of this file — always present, uncapped, and they survive `/compact`. Project context files are injected by hook on the first turn only. Don't re-read any of them unless a hook missed something
 - **Do not write to workspace-scoped memory** (`~/.claude/projects/.../memory/`). All persistent memory for this vault lives in vault files: `_self/about.md` (profile + behavior), `_self/corrections.md` (corrections and known failure modes), and project `_memory.md` files. Use `/remember` to persist anything worth keeping.
 - If a project was mentioned but context files are missing, search `{personal,professional,public}/projects/{name}/` and read `CLAUDE.md` and `_memory.md` manually
 - When creating a new note or project file, check `_templates/` first for a relevant template
@@ -203,4 +206,8 @@ These markers are scanned by `save-conversation.py` and written to the conversat
 
 ## Hook injection budget
 
-Each injected file (`_self/about.md`, `_self/corrections.md`, project `CLAUDE.md`, project `_memory.md`) has a 10,000-char hard limit. `/remember` consolidates new content into existing sections in-place — no raw append blocks. `/maintain` option 5 handles files that have grown large over time.
+Claude Code caps a hook's entire stdout at 10,000 chars — per hook invocation, not per file, so a turn matching several projects shares one budget. Two thresholds apply to the hook-injected files (project `CLAUDE.md`, project `_memory.md`): `HOOK_OUTPUT_CAP` (9,800) is the runtime limit, above which the injector emits a pointer line instead of the file body; `HOOK_BUDGET_HARD` (9,000, counting the injector's label) is the CI maintenance target. A file between the two still injects.
+
+`_self/about.md` and `_self/corrections.md` are `@` imports, not hook output, so no cap applies to them. Size still costs — they are in every request — so treat `HOOK_BUDGET_HARD` as an advisory target there rather than a limit.
+
+`/remember` consolidates new content into existing sections in-place — no raw append blocks. `/maintain` option 5 handles files that have grown large over time.

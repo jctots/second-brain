@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""T2 — Tests for inject-profile.py, inject-corrections.py, inject-context-claude.py, inject-context-memory.py.
+"""T2 — Tests for inject-context-claude.py and inject-context-memory.py.
 Utility functions (is_first_turn, get_first_user_message, etc.) live in _hook_utils.py and are tested here
-via the inject scripts that import them."""
+via the inject scripts that import them.
+
+T2.7-T2.14 covered inject-profile.py and inject-corrections.py, retired when `_self/about.md`
+and `_self/corrections.md` moved to `@` imports in root CLAUDE.md. The numbers are left
+vacant rather than reused — T#.# identifiers are stable (D126)."""
 import importlib.util
 import json
 import subprocess
@@ -24,7 +28,6 @@ def load_script(name):
     return mod
 
 
-_profile = load_script("inject-profile.py")
 _context = load_script("inject-context-claude.py")
 
 
@@ -50,114 +53,37 @@ def run_script(script_name, stdin_data):
 class TestIsFirstTurn(unittest.TestCase):
 
     def test_t2_1_no_transcript(self):
-        assert _profile.is_first_turn("/nonexistent/path/x.jsonl") is True
+        assert _context.is_first_turn("/nonexistent/path/x.jsonl") is True
 
     def test_t2_2_only_user_entries(self):
         with tempfile.TemporaryDirectory() as d:
             t = Path(d) / "t.jsonl"
             make_transcript([{"type": "user"}], t)
-            assert _profile.is_first_turn(str(t)) is True
+            assert _context.is_first_turn(str(t)) is True
 
     def test_t2_3_has_assistant_entry(self):
         with tempfile.TemporaryDirectory() as d:
             t = Path(d) / "t.jsonl"
             make_transcript([{"type": "user"}, {"type": "assistant"}], t)
-            assert _profile.is_first_turn(str(t)) is False
+            assert _context.is_first_turn(str(t)) is False
 
     def test_t2_4_empty_transcript(self):
         with tempfile.TemporaryDirectory() as d:
             t = Path(d) / "t.jsonl"
             t.write_text("", encoding="utf-8")
-            assert _profile.is_first_turn(str(t)) is True
+            assert _context.is_first_turn(str(t)) is True
 
     def test_t2_5_malformed_json_lines(self):
         with tempfile.TemporaryDirectory() as d:
             t = Path(d) / "t.jsonl"
             t.write_text('not json\n{"type":"user"}\n', encoding="utf-8")
-            assert _profile.is_first_turn(str(t)) is True
+            assert _context.is_first_turn(str(t)) is True
 
     def test_t2_6_blank_lines(self):
         with tempfile.TemporaryDirectory() as d:
             t = Path(d) / "t.jsonl"
             t.write_text('\n\n{"type":"user"}\n\n', encoding="utf-8")
-            assert _profile.is_first_turn(str(t)) is True
-
-
-# --- T2.7-T2.14: inject-profile.py / inject-corrections.py main() ---
-
-class TestInjectProfileMain(unittest.TestCase):
-
-    def _vault(self, d, about=None, corrections=None):
-        vault = Path(d)
-        (vault / "_self").mkdir(exist_ok=True)
-        if about is not None:
-            (vault / "_self/about.md").write_text(about, encoding="utf-8")
-        if corrections is not None:
-            (vault / "_self/corrections.md").write_text(corrections, encoding="utf-8")
-        return vault
-
-    def test_t2_7_profile_first_turn(self):
-        with tempfile.TemporaryDirectory() as d:
-            vault = self._vault(d, about="# About\nSystems engineer.")
-            t = Path(d) / "t.jsonl"
-            make_transcript([{"type": "user"}], t)
-            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "hello"})
-            rc, out = run_script("inject-profile.py", hook)
-            assert rc == 0
-            assert "Systems engineer." in out
-
-    def test_t2_8_corrections_first_turn(self):
-        with tempfile.TemporaryDirectory() as d:
-            vault = self._vault(d, corrections="# Corrections\nBe terse.")
-            t = Path(d) / "t.jsonl"
-            make_transcript([{"type": "user"}], t)
-            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "hello"})
-            rc, out = run_script("inject-corrections.py", hook)
-            assert rc == 0
-            assert "Be terse." in out
-
-    def test_t2_9_empty_stdin(self):
-        rc, out = run_script("inject-profile.py", "")
-        assert rc == 0
-        assert out == ""
-
-    def test_t2_10_invalid_json_stdin(self):
-        rc, out = run_script("inject-profile.py", "not json")
-        assert rc == 0
-        assert out == ""
-
-    def test_t2_11_no_transcript_path_injects_unconditionally(self):
-        with tempfile.TemporaryDirectory() as d:
-            vault = self._vault(d, about="# About\nHello.")
-            hook = json.dumps({"cwd": str(vault), "prompt": "hello"})
-            rc, out = run_script("inject-profile.py", hook)
-            assert rc == 0
-            assert "Hello." in out
-
-    def test_t2_12_second_turn_no_output(self):
-        with tempfile.TemporaryDirectory() as d:
-            vault = self._vault(d, about="# About\nHello.")
-            t = Path(d) / "t.jsonl"
-            make_transcript([{"type": "user"}, {"type": "assistant"}], t)
-            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "next"})
-            rc, out = run_script("inject-profile.py", hook)
-            assert rc == 0
-            assert out.strip() == ""
-
-    def test_t2_13_about_missing_no_crash(self):
-        with tempfile.TemporaryDirectory() as d:
-            vault = self._vault(d)  # _self/ exists but no about.md
-            t = Path(d) / "t.jsonl"
-            make_transcript([{"type": "user"}], t)
-            hook = json.dumps({"transcript_path": str(t), "cwd": str(vault), "prompt": "hello"})
-            rc, out = run_script("inject-profile.py", hook)
-            assert rc == 0
-            assert out.strip() == ""
-
-    def test_t2_14_cwd_missing_defaults_dot(self):
-        hook = json.dumps({"transcript_path": "/nonexistent.jsonl", "prompt": "hello"})
-        rc, _ = run_script("inject-profile.py", hook)
-        assert rc == 0
+            assert _context.is_first_turn(str(t)) is True
 
 
 # --- T2.15-T2.19: get_first_user_message ---
@@ -500,15 +426,11 @@ class TestStripIdeSelection(unittest.TestCase):
 
 class TestSmoke(unittest.TestCase):
 
-    def test_smoke_inject_profile(self):
-        hook = json.dumps({"cwd": str(REPO), "prompt": "hello"})
-        rc, _ = run_script("inject-profile.py", hook)
-        assert rc == 0
-
-    def test_smoke_inject_corrections(self):
-        hook = json.dumps({"cwd": str(REPO), "prompt": "hello"})
-        rc, _ = run_script("inject-corrections.py", hook)
-        assert rc == 0
+    def test_smoke_self_imports_declared(self):
+        """Root CLAUDE.md must import both _self/ files — they have no hook fallback."""
+        claude_md = (REPO / "CLAUDE.md").read_text(encoding="utf-8")
+        assert "@_self/about.md" in claude_md
+        assert "@_self/corrections.md" in claude_md
 
     def test_smoke_inject_context_claude(self):
         hook = json.dumps({"cwd": str(REPO), "prompt": "second-brain-setup"})

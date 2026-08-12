@@ -180,7 +180,10 @@ def count_inbox(root):
 
 
 def _read_budget_warn(root) -> int:
-    hard, warn_pct = 10_000, 80
+    # Defaults mirror _tests/test_hook_budget.py — the CI maintenance target, not the
+    # 10,000-char runtime cap (HOOK_OUTPUT_CAP). Keep the two in sync or the dashboard
+    # reports green on files CI fails.
+    hard, warn_pct = 9_000, 80
     env_file = root / ".env"
     if env_file.exists():
         for line in env_file.read_text(encoding="utf-8").splitlines():

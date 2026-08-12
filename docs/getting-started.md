@@ -171,7 +171,7 @@ your-repo/
 
 ## 💡 Tips
 
-**Keep project instruction files under ~8,000 characters each.** Context has a hard budget per hook (10,000 chars) — large files are silently truncated. See [claude-integration.md](claude-integration.md) for details.
+**Keep project instruction files under ~9,000 characters each.** Claude Code caps a hook's whole output at 10,000 chars — per hook invocation, not per file, so a turn touching two projects shares one budget. Files over the target still load; once the budget runs out, the injector swaps the remainder for a pointer line telling Claude to read the file itself. See [claude-integration.md](claude-integration.md) for details.
 
 **Name your project folders with kebab-case.** Easier to detect from natural language in your first message.
 

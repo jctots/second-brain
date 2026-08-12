@@ -21,6 +21,38 @@ ENV_FILE = VAULT_ROOT / ".env"
 CLAUDE_SETTINGS = Path.home() / ".claude" / "settings.json"
 
 
+# ── _self/ seeding ─────────────────────────────────────────────────────────────
+
+# Root CLAUDE.md imports these with `@_self/…`. A missing import is silently skipped
+# by Claude Code, so a fresh clone is not broken without them — it just has no profile.
+SELF_SEEDS = {
+    "about.md": "about-template.md",
+    "corrections.md": "corrections-template.md",
+}
+
+
+def seed_self_files() -> None:
+    """Create _self/{about,corrections}.md from _templates/ if they don't exist."""
+    self_dir = VAULT_ROOT / "_self"
+    self_dir.mkdir(exist_ok=True)
+    created = []
+    for target_name, template_name in SELF_SEEDS.items():
+        target = self_dir / target_name
+        template = VAULT_ROOT / "_templates" / template_name
+        if target.exists() or not template.exists():
+            continue
+        target.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
+        created.append(f"_self/{target_name}")
+
+    print("\n[_self] Profile files")
+    if created:
+        for path in created:
+            print(f"  created {path} from template")
+        print("  Edit the placeholders, or just start working — /remember fills these in.")
+    else:
+        print("  Already present — left unchanged.")
+
+
 # ── stack.yaml ─────────────────────────────────────────────────────────────────
 
 def parse_vscode_extensions() -> list[str]:
@@ -415,15 +447,22 @@ def _cfg_pdf_sidecars() -> None:
 def _cfg_hook_budget() -> None:
     env = read_env()
     print()
-    print(f"  Current HOOK_BUDGET_HARD    : {env.get('HOOK_BUDGET_HARD', '10000 (default)')}")
+    print("  Two thresholds, different jobs. Claude Code caps a hook's entire stdout")
+    print("  at 10,000 chars — one hook writes one stdout, so a turn matching several")
+    print("  projects shares a single cap.")
+    print()
+    print(f"  Current HOOK_OUTPUT_CAP     : {env.get('HOOK_OUTPUT_CAP', '9800 (default)')}")
+    print(f"  Current HOOK_BUDGET_HARD    : {env.get('HOOK_BUDGET_HARD', '9000 (default)')}")
     print(f"  Current HOOK_BUDGET_WARN_PCT: {env.get('HOOK_BUDGET_WARN_PCT', '80 (default)')}")
     print()
     print("  To change: edit .env at vault root and set:")
-    print("    HOOK_BUDGET_HARD=10000     # hard char limit per file — CI fails above this")
-    print("    HOOK_BUDGET_WARN_PCT=80    # warn threshold as % of hard limit")
+    print("    HOOK_OUTPUT_CAP=9800       # runtime — injectors degrade to a pointer line above this")
+    print("    HOOK_BUDGET_HARD=9000      # maintenance target — CI fails above this")
+    print("    HOOK_BUDGET_WARN_PCT=80    # warn threshold as % of HOOK_BUDGET_HARD")
     print()
-    print("  These affect: test_hook_budget.py (CI), generate-dashboard.py (budget section),")
-    print("  and check-health.py (startup health check).")
+    print("  HOOK_OUTPUT_CAP affects: the inject-*.py hooks at runtime (via _hook_utils).")
+    print("  HOOK_BUDGET_HARD affects: test_hook_budget.py (CI), generate-dashboard.py")
+    print("  (budget section), and check-health.py (startup health check).")
 
 
 def _cfg_ntfy_toggles() -> None:
@@ -506,6 +545,7 @@ def main() -> None:
     else:
         install_pip_deps()
         install_extensions()
+        seed_self_files()
         configure_optional_services()
 
     print("\nSetup complete.")

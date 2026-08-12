@@ -12,14 +12,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python _scripts/inject-profile.py"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "python _scripts/inject-context-claude.py"
           }
         ]
@@ -29,14 +21,6 @@
           {
             "type": "command",
             "command": "python _scripts/inject-context-memory.py"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python _scripts/inject-corrections.py"
           }
         ]
       },

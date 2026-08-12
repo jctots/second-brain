@@ -7,7 +7,7 @@ Scenarios are identified as **T#.#** — first number is the test file, second i
 | T# | File | Covers |
 |---|---|---|
 | T1 | `test_hook_budget.py` | Hook injection budget enforcement |
-| T2 | `test_inject_hooks.py` | `inject-profile.py`, `inject-corrections.py`, `inject-context-claude.py`, `inject-context-memory.py`; utility functions via `_hook_utils.py` |
+| T2 | `test_inject_hooks.py` | `inject-context-claude.py`, `inject-context-memory.py`; utility functions via `_hook_utils.py` |
 | T3 | `test_save_conversation.py` | `save-conversation.py` |
 | T4 | `test_generate_pending_events.py` | `generate-pending-events.py` |
 | T5 | `test_generate_dashboard.py` | `generate-dashboard.py` — resource/area collection, snapshot parsing (incl. next actions), tag pages, system health block |
@@ -54,18 +54,12 @@ This is a health check script, not a unit test file. It runs against the real va
 | T2.5 | Transcript file has lines with malformed JSON | Skips bad lines, continues scanning | R11 |
 | T2.6 | Transcript file has blank lines interspersed | Skips blank lines, continues scanning | R11 |
 
-### `inject-profile.py` / `inject-corrections.py` — `main()`
+### T2.7–T2.14 — retired
 
-| # | Scenario | Expected | Req |
-|---|---|---|---|
-| T2.7 | `_self/about.md` exists, first turn | Outputs content with correct label prefix, exits 0 | R6 |
-| T2.8 | `_self/corrections.md` exists, first turn | Outputs content with correct label prefix, exits 0 | R6 |
-| T2.9 | stdin is empty string | Exits 0, no output | R11 |
-| T2.10 | stdin is invalid JSON | Exits 0, no output | R11 |
-| T2.11 | Hook data has no `transcript_path` key | Injects unconditionally (no turn check), exits 0 | R11 |
-| T2.12 | `transcript_path` present, second turn (assistant entry exists) | Exits 0, no output | |
-| T2.13 | `_self/about.md` does not exist | Exits 0, no output — no crash | R11 |
-| T2.14 | `cwd` missing from hook data | Defaults to `.`, no crash | R11 |
+Covered `inject-profile.py` and `inject-corrections.py`, removed when `_self/about.md` and
+`_self/corrections.md` moved to `@` imports in root `CLAUDE.md`. The numbers are left vacant
+rather than reused — T#.# identifiers are stable (D126). A smoke test asserts both import
+lines are present in root `CLAUDE.md`, since the files now have no hook fallback.
 
 ### `get_first_user_message(transcript_path)`
 
@@ -482,8 +476,7 @@ Uses `127.0.0.1:19999` (closed port) with `RAG_TIMEOUT=1` for fast failure.
 
 | Script | Smoke assertion | Req |
 |---|---|---|
-| `inject-profile.py` | Exits 0; output contains `_self/about.md` content | R6, R11 |
-| `inject-corrections.py` | Exits 0; output contains `_self/corrections.md` content | R6, R11 |
+| root `CLAUDE.md` | Contains both `@_self/about.md` and `@_self/corrections.md` import lines | R6 |
 | `inject-context-claude.py` | Exits 0 with a known project name in prompt | R11 |
 | `inject-context-memory.py` | Exits 0 with a known project name in prompt | R11 |
 | `save-conversation.py` | Exits 0 when given a valid transcript path | R10, R11 |
