@@ -157,10 +157,10 @@ AI reasoning layer. Operates on the vault as a tool-using agent: reads files, ed
 
 **Context loading (hook-guaranteed, every turn):**
 
+`_self/about.md` and `_self/corrections.md` are not hook-injected — root `CLAUDE.md` loads them with `@` imports, which have no character cap and survive `/compact`.
+
 ```
 UserPromptSubmit fires
-  → inject-profile.py         → injects _self/about.md summary          (first turn only)
-  → inject-corrections.py           → injects _self/corrections.md summary          (first turn only)
   → inject-context-claude.py  → detects project, injects project CLAUDE.md  (first turn only)
   → inject-context-memory.py  → detects project, injects project _memory.md (first turn only)
   → inject-context-rag.py     → embeds message, queries Qdrant, injects matching note titles
@@ -186,8 +186,6 @@ Python scripts callable both from Claude Code hooks and Gitea Actions CI. No ext
 | Script | Called by | Purpose |
 |---|---|---|
 | `_hook_utils.py` | Shared library (imported by all hook scripts) | `is_first_turn`, `load_dotenv`, `get_first_user_message`, `get_ide_opened_file`, `find_project_from_file`, `strip_ide_selection`, `find_projects_in_message`, `CONTEXTS`. Not a hook itself — no stdin, no output. |
-| `inject-profile.py` | Hook (`UserPromptSubmit`) | Inject `_self/about.md` summary |
-| `inject-corrections.py` | Hook (`UserPromptSubmit`) | Inject `_self/corrections.md` summary |
 | `inject-context-claude.py` | Hook (`UserPromptSubmit`) | Detect project, inject project `CLAUDE.md` |
 | `inject-context-memory.py` | Hook (`UserPromptSubmit`) | Detect project, inject project `_memory.md` |
 | `inject-context-project.py` *(planned)* | Hook (`UserPromptSubmit`) | Detect project via Qdrant embedding (Tier 2/3) or keyword match (Tier 1 fallback); inject project `CLAUDE.md` + `_memory.md` — replaces `inject-context-claude.py` + `inject-context-memory.py` on Tier 2/3 |
@@ -212,8 +210,6 @@ Python scripts callable both from Claude Code hooks and Gitea Actions CI. No ext
 ```
 User types first message
   → UserPromptSubmit hook fires (guaranteed, every turn)
-      inject-profile.py         → _self/about.md → prepended to context          (first turn)
-      inject-corrections.py     → _self/corrections.md → prepended to context    (first turn)
       inject-context-claude.py  → project CLAUDE.md → prepended to context       (first turn)
       inject-context-memory.py  → project _memory.md → prepended to context      (first turn)
       inject-context-projects.py → ## Active Projects registry (all projects)     (first turn)
@@ -347,12 +343,13 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 
 ### Configured hooks
 
-#### Profile injection (`UserPromptSubmit`)
+#### Profile and corrections (`@` imports — not hooks)
 
-**File:** `_scripts/inject-profile.py`
-**Fires on:** Every `UserPromptSubmit`, self-limits to first turn only
-**What it does:** Reads `_self/about.md` and outputs the full file content.
-**Budget:** ≤ 10,000 chars (warn at 8,000; consolidation target 5,000).
+**Files:** `_self/about.md`, `_self/corrections.md`
+**Loaded by:** two `@` import lines at the top of root `CLAUDE.md`
+**Why not hooks:** hook output is capped at 10,000 chars per invocation and is a one-time first-turn injection that does not return after `/compact`. Imports have no cap and are re-sent every request.
+**Budget:** none enforced. `HOOK_BUDGET_HARD` is applied as an advisory warning only, because the content is in every request and size is a running token cost.
+**Missing file:** silently skipped by Claude Code — no warning, no error. `setup.py` seeds both from `_templates/`.
 
 ---
 
@@ -361,7 +358,7 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 **File:** `_scripts/inject-context-claude.py`
 **Fires on:** Every `UserPromptSubmit`, self-limits to first turn only
 **What it does:** Reads `hook_data["prompt"]` (falls back to first user message in transcript). Scans `personal/`, `professional/`, `public/` for any project whose name appears in the message. For each matched project, reads its `CLAUDE.md`.
-**Budget:** ≤ 10,000 chars (warn at 8,000; consolidation target 5,000).
+**Budget:** one `HOOK_OUTPUT_CAP` (9,800) shared across *all* matched projects; overflow degrades to a pointer line via `emit_capped()`. CI target `HOOK_BUDGET_HARD` (9,000) is per file, counting the injector's label.
 
 ---
 
@@ -370,16 +367,7 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 **File:** `_scripts/inject-context-memory.py`
 **Fires on:** Every `UserPromptSubmit`, self-limits to first turn only
 **What it does:** Same project-matching logic as above. Reads `_memory.md` for each matched project.
-**Budget:** ≤ 10,000 chars (warn at 8,000; consolidation target 5,000).
-
----
-
-#### Feedback injection (`UserPromptSubmit`)
-
-**File:** `_scripts/inject-corrections.py`
-**Fires on:** Every `UserPromptSubmit`, self-limits to first turn only
-**What it does:** Reads `_self/corrections.md` and outputs the full file content.
-**Budget:** ≤ 10,000 chars (warn at 8,000; consolidation target 5,000).
+**Budget:** same as above — one shared cap per invocation, not per project.
 
 ---
 
@@ -418,7 +406,7 @@ Hook commands receive JSON on stdin with fields including `transcript_path`, `cw
 **Fires on:** Every `UserPromptSubmit`, self-limits to first turn only
 **What it does:** Embeds the user's first message via Ollama; queries Qdrant against project-indexed embeddings to identify the relevant project; injects its `CLAUDE.md` + `_memory.md`. Falls back to keyword match on project folder names when Qdrant is unavailable.
 **Replaces:** `inject-context-claude.py` + `inject-context-memory.py` on Tier 2/3 (those scripts remain active for Tier 1).
-**Budget:** ≤ 10,000 chars (warn at 8,000; consolidation target 5,000).
+**Budget:** shares the invocation's `HOOK_OUTPUT_CAP` with the other matched projects.
 **Tier:** Tier 2/3 only.
 
 ---
@@ -506,8 +494,8 @@ Two jobs:
 
 | Behavior | Mechanism | Reliable? |
 |---|---|---|
-| Load `_self/about.md` summary | Hook (`inject-profile.py`) | Yes — guaranteed first turn |
-| Load `_self/corrections.md` | Hook (`inject-corrections.py`) | Yes — guaranteed first turn |
+| Load `_self/about.md` | `@` import in root CLAUDE.md | Yes — every request, survives /compact |
+| Load `_self/corrections.md` | `@` import in root CLAUDE.md | Yes — every request, survives /compact |
 | Load project `CLAUDE.md` | Hook (`inject-context-claude.py`) | Yes — if project name is in first message |
 | Load project `_memory.md` | Hook (`inject-context-memory.py`) | Yes — if project name is in first message |
 | Infer context and confirm with user | CLAUDE.md instruction | No — can be missed |
@@ -527,10 +515,10 @@ Context-level files (`personal/CLAUDE.md` etc.) were removed — rules folded in
 
 Workspace-scoped memory (`.claude/projects/.../memory/`) is **not used in this repo** (D94, D124). All persistent memory lives in vault files:
 
-| File | Content | Injected by |
+| File | Content | Loaded by |
 |---|---|---|
-| `_self/about.md` | Profile + behavioral patterns | `inject-profile.py` |
-| `_self/corrections.md` | Feedback rules and corrections | `inject-corrections.py` |
+| `_self/about.md` | Profile + behavioral patterns | `@` import in root CLAUDE.md |
+| `_self/corrections.md` | Feedback rules and corrections | `@` import in root CLAUDE.md |
 | project `_memory.md` | Project state + open questions | `inject-context-memory.py` |
 
 These files travel with the repo, are git-versioned, and are readable in Obsidian. Workspace-scoped memory is machine-local, not vault-portable, and invisible to Obsidian/Foam — retired for these reasons. See [[second-brain-setup/decisions/D124-vault-native-memory-design-markers-judgment-pass-maintain-ba|D124]] for the full tradeoff analysis.
@@ -561,8 +549,8 @@ Adding a new command: create `.claude/commands/{name}.md`. No registration requi
 | Behavior | Mechanism | Reliability |
 |---|---|---|
 | Save conversation to `_conversations/` + ntfy if events pending | Hook (`Stop` + `SessionEnd`) | Guaranteed — ntfy skipped if `NTFY_URL` not set |
-| Load `_self/about.md` at session start | Hook (`inject-profile.py`) | Guaranteed — first turn only |
-| Load `_self/corrections.md` at session start | Hook (`inject-corrections.py`) | Guaranteed — first turn only |
+| Load `_self/about.md` | `@` import in root CLAUDE.md | Guaranteed — every request |
+| Load `_self/corrections.md` | `@` import in root CLAUDE.md | Guaranteed — every request |
 | Load project `CLAUDE.md` | Hook (`inject-context-claude.py`) | Guaranteed if project name in first message |
 | Load project `_memory.md` | Hook (`inject-context-memory.py`) | Guaranteed if project name in first message |
 | Emit event markers mid-conversation | CLAUDE.md instruction | Unreliable — mitigated by `/remember` judgment pass |
@@ -810,7 +798,7 @@ Test scripts in `_tests/` verify requirements automatically. They run in Gitea A
 
 | Test | Requirement | What it checks |
 |---|---|---|
-| `test_hook_budget.py` | R6 | Each hook-injected file: warn at 8,000 chars (80%), fail at 10,000 chars (100%) — checked independently per file |
+| `test_hook_budget.py` | R6 | Each hook-injected file, label included: warn at `HOOK_BUDGET_WARN_PCT` of `HOOK_BUDGET_HARD` (default 80% of 9,000), fail above it. `_self/` imports are measured but never fail |
 | `test_inject_hooks.py` | R11 | Inject hook scripts — turn-detection, project matching, file injection, resilience |
 | `test_save_conversation.py` | R10, R11 | Event marker extraction, conversation file writing, frontmatter |
 | `test_generate_pending_events.py` | R7, R10, R11 | Pending events generation — frontmatter parsing, output format, resilience |
@@ -832,7 +820,7 @@ Tests are deterministic pass/fail scripts — stdlib Python only (R2), no Claude
 | R3 — Reproducibility | `infra.yaml` + setup scripts; CI uses direct `run:` steps |
 | R4 — Privacy | Three inference paths: cloud SaaS (Anthropic API, conscious tradeoff), private cloud (Claude Code + LiteLLM gateway → Ollama/vLLM on rented VPS), self-hosted (Claude Code + LiteLLM gateway → Ollama on user-owned hardware, no data leaves user infrastructure) |
 | R5 — No always-on processes | CI for scheduled work; no background daemons |
-| R6 — Hook budget | Four inject scripts, each with its own independent 10,000-char budget |
+| R6 — Hook budget | Two threshold vars (D134): `HOOK_OUTPUT_CAP` at runtime, `HOOK_BUDGET_HARD` in CI. Each hook script has its own 10,000-char stdout cap; `emit_capped()` degrades multi-project overflow to a pointer line. `_self/` files bypass the cap entirely as `@` imports |
 | R7 — Static generated files | CI-owned indexes; no Dataview or plugin-dependent queries |
 
 ---

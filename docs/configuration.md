@@ -101,14 +101,19 @@ PDF sidecars are controlled via a Gitea Actions variable — not in `.env`. The 
 
 ### 3.2 Hook budget
 
-Controls when files in `_self/` and project `CLAUDE.md`/`_memory.md` trigger warnings. Edit `.env` directly:
+Controls how much context project `CLAUDE.md`/`_memory.md` files may inject. Claude Code caps a hook's entire stdout at 10,000 chars — per hook invocation, not per file, so a turn matching several projects shares one cap. Run `setup.py` → option 3 → hook budget, or edit `.env` directly:
 
 | Variable | Default | Notes |
 |---|---|---|
-| `HOOK_BUDGET_HARD` | `10000` | Hard char limit per file — CI fails above this |
-| `HOOK_BUDGET_WARN_PCT` | `80` | Warn threshold as % of the hard limit |
+| `HOOK_OUTPUT_CAP` | `9800` | Runtime cap on a hook's whole stdout. Above this the injectors emit a pointer line instead of the file body |
+| `HOOK_BUDGET_HARD` | `9000` | Maintenance target per file, counting the injector's label — CI fails above this |
+| `HOOK_BUDGET_WARN_PCT` | `80` | Warn threshold as % of `HOOK_BUDGET_HARD` |
 
-Affects: `test_hook_budget.py` (CI), `generate-dashboard.py` (budget section in dashboard).
+`HOOK_OUTPUT_CAP` is where injection stops being possible; `HOOK_BUDGET_HARD` is where you should start trimming. A file between the two still injects.
+
+`_self/about.md` and `_self/corrections.md` are `@` imports in root `CLAUDE.md`, not hook output — neither variable caps them. They are still measured against `HOOK_BUDGET_HARD` as an advisory warning, because they are in every request.
+
+Affects: `_scripts/_hook_utils.py` and the `inject-*.py` hooks (runtime cap), `test_hook_budget.py` (CI), `generate-dashboard.py` (budget section in dashboard), `check-health.py` (startup check).
 
 ### 3.3 ntfy events
 

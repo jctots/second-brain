@@ -2,8 +2,9 @@
 Template: CLAUDE.md
 Use: Place one CLAUDE.md in each active project folder.
 Injected by hook at session start when the project name appears in the first message.
-Budget: combined CLAUDE.md + _memory.md summary sections must stay ≤ 6,666 chars.
-See personal/projects/second-brain-setup/reference.md for hook injection details.
+Budget: keep under HOOK_BUDGET_HARD (default 9,000 chars, counting the injector's label).
+A turn matching several projects shares one 10,000-char cap across all of them.
+See docs/claude-integration.md for hook injection details.
 -->
 
 # {project-name} — Project Instructions

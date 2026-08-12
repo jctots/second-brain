@@ -46,12 +46,11 @@ def _budget_config(repo: Path) -> tuple[int, float]:
 
 CONTEXTS = ["personal", "professional", "public"]
 
-# Labels each injector prepends to the file body. Kept in sync with _scripts/inject-*.py —
-# the cap applies to the hook's whole stdout, so these count against the budget.
-SELF_LABELS = {
-    "about.md": "The following is the user profile and behavioral context, loaded automatically at session start:\n\n",
-    "corrections.md": "The following are your corrections, loaded automatically at session start:\n\n",
-}
+# ADVISORY: `_self/about.md` and `_self/corrections.md` are no longer hook output — root
+# CLAUDE.md loads them with `@` imports, which have no character cap. They are still
+# measured and warned on, because they sit in every request and size is a token cost,
+# but they never fail the build and their absence is legal (a fresh clone has neither).
+# They carry no injector label, so nothing is added to their length.
 
 
 def project_label(filename: str, project: str, context: str) -> str:
@@ -91,11 +90,8 @@ def main() -> int:
         for self_file in ("about.md", "corrections.md"):
             f = repo / "_self" / self_file
             if f.exists():
-                n = summary_length(f, SELF_LABELS[self_file])
-                check(f"_self/{self_file}", n, failures, warnings, LIMIT, WARN_AT)
-            else:
-                print(f"FAIL _self/{self_file}: not found")
-                failures.append(f"_self/{self_file} missing")
+                # Advisory only — never appended to `failures`. See ADVISORY note above.
+                check(f"_self/{self_file}", summary_length(f), [], warnings, LIMIT, WARN_AT)
 
     for context in CONTEXTS:
         projects_dir = repo / context / "projects"

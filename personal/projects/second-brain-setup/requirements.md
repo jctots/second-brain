@@ -23,12 +23,12 @@ created: 2026-04-29
 | R3 | Reproducibility | — | — |
 | R4 | Privacy / data sovereignty | — | — |
 | R5 | No always-on processes | A2 | — |
-| R6 | Hook injection budget | — | T1.1–T1.8; T2.7–T2.8 |
+| R6 | Hook injection budget | — | T1.1–T1.8 |
 | R7 | Generated artifacts are static | A2 | T4.3,T4.13–T4.17; T5.1–T5.22 |
 | R8 | Framework/content boundary | — | — |
 | R9 | Contributor workflow parity | — | — |
 | R10 | Deferred capture | A1 | T3.1–T3.32; T4.1–T4.2,T4.9–T4.12 |
-| R11 | Script and hook resilience | A3 | T1.3–T1.4,T1.8; T2.1,T2.4–T2.6,T2.9–T2.14,T2.17–T2.19,T2.21–T2.22,T2.24–T2.28,T2.32–T2.33,T2.38–T2.39; T3.7,T3.20,T3.25,T3.29–T3.30,T3.33–T3.39; T4.4–T4.8,T4.15; T5.10–T5.11,T5.16–T5.17,T5.21; T8.1–T8.4,T8.7,T8.9–T8.13 |
+| R11 | Script and hook resilience | A3 | T1.3–T1.4,T1.8; T2.1,T2.4–T2.6,T2.17–T2.19,T2.21–T2.22,T2.24–T2.28,T2.32–T2.33,T2.38–T2.39; T3.7,T3.20,T3.25,T3.29–T3.30,T3.33–T3.39; T4.4–T4.8,T4.15; T5.10–T5.11,T5.16–T5.17,T5.21; T8.1–T8.4,T8.7,T8.9–T8.13 |
 | R12 | Optional infrastructure graceful degradation | A4 | T6.30–T6.34; T7.1–T7.5; T8.5,T8.6,T8.8 |
 
 ---
@@ -99,21 +99,29 @@ The system must not require background services to function.
 
 ## R6 — Hook injection budget
 
-Claude Code caps each hook command's output independently at ~10,000 characters; output beyond that is redirected to a file reference instead of being injected into context. Each inject script has its own independent budget.
+Claude Code caps each hook command's **entire stdout** at ~10,000 characters — per invocation, not per file. Output beyond that is written to a file and replaced by a preview, dropping the rest. Each hook script has its own independent cap, but a single script matching several projects spends one cap across all of them.
 
-| Hook | File | Warn | Hard limit | Consolidation target |
-|---|---|---|---|---|
-| `inject-profile.py` | `_self/about.md` | 8,000 chars (80%) | 10,000 chars | 5,000 chars |
-| `inject-rules.py` | `_self/rules.md` | 8,000 chars (80%) | 10,000 chars | 5,000 chars |
-| `inject-context-claude.py` | project `CLAUDE.md` | 8,000 chars (80%) | 10,000 chars | 5,000 chars |
-| `inject-context-memory.py` | project `_memory.md` | 8,000 chars (80%) | 10,000 chars | 5,000 chars |
+Two thresholds, set in `.env` (D134):
+
+| Threshold | Default | Enforced by | Meaning |
+|---|---|---|---|
+| `HOOK_OUTPUT_CAP` | 9,800 | `_hook_utils.hook_budget()` at runtime | Where injection stops being possible |
+| `HOOK_BUDGET_HARD` | 9,000 | `test_hook_budget.py` in CI | Maintenance target, counting the injector's label |
+| `HOOK_BUDGET_WARN_PCT` | 80 | Both | Warn threshold as % of `HOOK_BUDGET_HARD` |
+
+| Channel | Files | Capped? |
+|---|---|---|
+| `inject-context-claude.py` | project `CLAUDE.md` | Yes — shared cap across matched projects |
+| `inject-context-memory.py` | project `_memory.md` | Yes — shared cap across matched projects |
+| `@` import in root `CLAUDE.md` | `_self/about.md`, `_self/corrections.md` | No — advisory warning only |
 
 **Implications:**
-- `/remember` appends timestamped blocks — no in-place editing of sections
-- `/maintain` option 4 consolidates files at the warning threshold, targeting 5,000 chars
+- A file between the two thresholds still injects. `HOOK_BUDGET_HARD` is a signal to trim, not a failure of the mechanism
+- Overflow degrades to a one-line pointer via `emit_capped()`, visible in the conversation — not a silent truncation
+- `/remember` consolidates in-place; `/maintain` option 5 targets 5,000 chars post-consolidation, the headroom that keeps maintenance rare
 - Aging content routes to `decisions/`, `resources/`, or is dropped — not preserved in an extended section
 
-**Verified by:** T1.1–T1.8; T2.7–T2.8
+**Verified by:** T1.1–T1.8
 
 ---
 
@@ -181,7 +189,7 @@ Every script and hook in `_scripts/` must exit 0 and not raise an unhandled exce
 - Generator scripts called by CI must handle empty or partial vault state without exiting non-zero
 - Missing input files must produce empty output, not a stack trace
 
-**Verified by:** T1.3–T1.4,T1.8; T2.1,T2.4–T2.6,T2.9–T2.14,T2.17–T2.19,T2.21–T2.22,T2.24–T2.28,T2.32–T2.33,T2.38–T2.39; T3.7,T3.20,T3.25,T3.29–T3.30,T3.33–T3.39; T4.4–T4.8,T4.15; T5.10–T5.11,T5.16–T5.17,T5.21; T8.1–T8.4,T8.7,T8.9–T8.13
+**Verified by:** T1.3–T1.4,T1.8; T2.1,T2.4–T2.6,T2.17–T2.19,T2.21–T2.22,T2.24–T2.28,T2.32–T2.33,T2.38–T2.39; T3.7,T3.20,T3.25,T3.29–T3.30,T3.33–T3.39; T4.4–T4.8,T4.15; T5.10–T5.11,T5.16–T5.17,T5.21; T8.1–T8.4,T8.7,T8.9–T8.13
 
 ---
 
