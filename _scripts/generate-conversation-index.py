@@ -87,7 +87,8 @@ def main():
             lines.append(f"| {e['date']} | {projects_str} | {conv_link} |")
         lines.append("")
 
-    index_path.write_text("\n".join(lines), encoding="utf-8")
+    with open(index_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(lines))
     print(f"Index updated: {len(entries)} conversations indexed.")
 
 

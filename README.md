@@ -118,7 +118,7 @@ Each context follows the same PARA layout:
 └── archive/         ← completed or inactive items
 ```
 
-Special folders: `_conversations/`, `_daily/`, `_inbox/`, `_infrastructure/`, `_scripts/`, `_templates/`
+Special folders: `_conversations/`, `_daily/`, `_inbox/`, `_infrastructure/`, `_scripts/`, `_self/`, `_templates/`, `_tests/`
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full repository layout.
 
@@ -129,7 +129,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full repository layout.
 1. Use this repo as a GitHub template → clone your fork
 2. Run setup: `bash _scripts/setup.sh` (macOS/Linux) or
    `powershell -File _scripts/setup.ps1` (Windows)
-3. Open `CLAUDE.md` and fill in the `{your-name}` placeholder
+3. Fill in the `{your-name}` placeholder in `_self/about.md` and `_self/corrections.md` — setup creates both from templates
 4. Start a session — the system is pre-configured and ready to use
 
 **Add later — Tier 2/3 (private inference):** [LiteLLM](https://litellm.ai), [Ollama](https://ollama.com), self-hosted Gitea (Tier 2: VPS · Tier 3: own hardware)

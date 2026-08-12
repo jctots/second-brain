@@ -353,7 +353,8 @@ def main():
         parts.append("")
 
     output_path = output_dir / filename
-    output_path.write_text("\n".join(parts), encoding="utf-8")
+    with open(output_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(parts))
 
     pending = [e for e in events if e not in processed]
     if pending and "--notify" in sys.argv:

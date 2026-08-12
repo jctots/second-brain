@@ -19,7 +19,7 @@ created: 2026-04-29
 | Req | Name | Architecture | Tests |
 |---|---|---|---|
 | R1 | Supported tools | — | — |
-| R2 | Platform portability | — | — |
+| R2 | Platform portability | — | T12.1–T12.5 |
 | R3 | Reproducibility | — | — |
 | R4 | Privacy / data sovereignty | — | — |
 | R5 | No always-on processes | A2 | — |
@@ -60,6 +60,9 @@ All scripts, hooks, and setup steps must work on Windows (primary) and Linux/mac
 - No PowerShell-only or bash-only scripts in `_scripts/` — platform-specific setup helpers (`.ps1`, `.sh`) are allowed for setup only
 - Use `pathlib` for all path handling; never hardcode separators
 - Scripts in `_scripts/` that require external packages must be CI-only and isolated in a CI venv; they must not be called by hooks or invoked without that venv. Hook scripts must remain stdlib-only.
+- Every file write must pin `newline="\n"` via `open(...)`. Python's text mode translates `\n` to `\r\n` on Windows, so an unpinned write makes a generator produce different bytes on Windows than on the Linux CI runner. `.gitattributes` normalizes on staging, which hides this in `git diff` while `git status` still reports the files modified and blocks `git pull`. `Path.write_text(newline=...)` is Python 3.10+ and cannot be used while 3.8 is supported.
+
+**Verified by:** T12.1–T12.5
 
 ---
 

@@ -148,7 +148,8 @@ def generate_tag_pages(root):
             for wl in sorted(wls):
                 lines.append(f"- {wl}")
             lines.append("")
-            page.write_text("\n".join(lines), encoding="utf-8")
+            with open(page, "w", encoding="utf-8", newline="\n") as f:
+                f.write("\n".join(lines))
 
         print(f"Generated {len(tag_map)} tag pages in {ctx}/resources/tags/")
 
@@ -387,7 +388,8 @@ def main():
         + toc_lines
     )
 
-    dashboard.write_text("\n".join(new_lines).rstrip() + "\n", encoding="utf-8")
+    with open(dashboard, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(new_lines).rstrip() + "\n")
     print("Updated: dashboard.md")
 
 

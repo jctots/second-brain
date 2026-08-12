@@ -75,6 +75,7 @@ powershell -ExecutionPolicy Bypass -File _scripts/setup.ps1
 What setup does:
 - Reads [`_infrastructure/stack.yaml`](../_infrastructure/stack.yaml) for the list of required VS Code extensions and installs them
 - Configures the save-conversation hook in VS Code settings
+- Creates `_self/about.md` and `_self/corrections.md` from `_templates/`, if they don't already exist — you fill these in at Step 5
 
 
 ## ☁️ Step 3: Sign in to Claude Code
@@ -101,21 +102,27 @@ ollama pull qwen2.5:32b
 For GPU hardware, larger models (`qwen2.5:32b`) give better reasoning quality. Without a GPU, 7B models are the practical ceiling for reasonable response times.
 
 
-## 👤 Step 5: Create your profile
+## 👤 Step 5: Fill in your profile
 
-Create `_self/about.md`. This file is where the AI will maintain a profile and behavioral reflection about you across sessions. Start minimal — it will populate over time:
+Step 2 already created these two files for you, from the matching templates in `_templates/`:
+
+| File | Holds |
+|---|---|
+| `_self/about.md` | Who you are and how you work — the patterns Claude uses to calibrate its responses |
+| `_self/corrections.md` | Feedback that should persist: how you want to be talked to, and mistakes not to repeat |
+
+Open each, replace `{your-name}`, and delete the placeholder bullets. A few honest lines beat a long guess — `/remember` fills these in over time as it learns how you work.
+
+Both are loaded by `@` import lines at the top of the root `CLAUDE.md`:
 
 ```markdown
-# About {your-name}
-
-## Profile
-
-_AI-maintained. Updated via /remember._
-
-## Reflection
-
-_AI-maintained. Updated via /remember._
+@_self/about.md
+@_self/corrections.md
 ```
+
+That is deliberate, and different from how project context loads. Imports are part of every request, so unlike hook output they are not capped at 10,000 characters and they survive `/compact`. The trade-off is that their content costs tokens on every message — so keep them to what actually changes Claude's behavior.
+
+If you skip this step, nothing breaks. A missing `@` import is silently ignored, and you simply start with no profile loaded.
 
 
 ## 📁 Step 6: Start with the pre-seeded setup project
@@ -172,7 +179,8 @@ your-repo/
 ├── _daily/             ← daily notes (YYYY-MM-DD.md)
 ├── _conversations/     ← saved sessions
 ├── _self/
-│   └── about.md        ← AI-maintained profile
+│   ├── about.md        ← AI-maintained profile, loaded via @ import
+│   └── corrections.md  ← persistent feedback, loaded via @ import
 └── _templates/         ← note templates
 ```
 

@@ -59,7 +59,8 @@ def main():
 
         if content:
             dest = pdf.parent / f"{pdf.stem}.md"
-            dest.write_text(content, encoding="utf-8")
+            with open(dest, "w", encoding="utf-8", newline="\n") as f:
+                f.write(content)
             print(f"  → {dest}")
         else:
             print(f"  failed: {pdf}")
