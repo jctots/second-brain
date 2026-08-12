@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """R6 — Verify hook-injected file sizes stay within per-file budget limits.
 
-Each hook command has an independent ~10k char cap before Claude Code redirects
-output to a file reference instead of injecting it directly. Hard limit is 10,000
-chars per file; warn at 8,000 (80%); consolidation target is 5,000 chars.
+Claude Code caps a hook's entire *stdout* at 10,000 chars, not the file it reads.
+Each injector prepends a label before the file body, so a file measured alone can
+pass here and still be truncated live — this test therefore measures
+`len(label) + len(file)`, and HOOK_BUDGET_HARD defaults to 9,000 to leave headroom.
+
+A turn matching several projects puts every match under one cap. That case is not
+enumerable here; `_hook_utils.emit_capped()` degrades the overflow to a pointer line
+at injection time instead.
 
 Exit codes:
   0 — all files within limit (warnings may be printed for files over 80%)
@@ -29,9 +34,9 @@ def _load_dotenv(repo: Path) -> dict:
 def _budget_config(repo: Path) -> tuple[int, float]:
     env = _load_dotenv(repo)
     try:
-        hard = int(env.get("HOOK_BUDGET_HARD", "10000"))
+        hard = int(env.get("HOOK_BUDGET_HARD", "9000"))
     except ValueError:
-        hard = 10_000
+        hard = 9_000
     try:
         warn_pct = float(env.get("HOOK_BUDGET_WARN_PCT", "80"))
     except ValueError:
@@ -41,9 +46,20 @@ def _budget_config(repo: Path) -> tuple[int, float]:
 
 CONTEXTS = ["personal", "professional", "public"]
 
+# Labels each injector prepends to the file body. Kept in sync with _scripts/inject-*.py —
+# the cap applies to the hook's whole stdout, so these count against the budget.
+SELF_LABELS = {
+    "about.md": "The following is the user profile and behavioral context, loaded automatically at session start:\n\n",
+    "corrections.md": "The following are your corrections, loaded automatically at session start:\n\n",
+}
 
-def summary_length(path: Path) -> int:
-    return len(path.read_text(encoding="utf-8"))
+
+def project_label(filename: str, project: str, context: str) -> str:
+    return f"Project {filename} auto-loaded for `{project}` ({context}/projects/):\n\n"
+
+
+def summary_length(path: Path, label: str = "") -> int:
+    return len(label) + len(path.read_text(encoding="utf-8"))
 
 
 def check(label: str, n: int, failures: list, warnings: list, limit: int, warn_at: float) -> None:
@@ -69,13 +85,17 @@ def main() -> int:
     filter_arg = sys.argv[1] if len(sys.argv) > 1 else None
     project_filter = None if (not filter_arg or filter_arg == "all") else filter_arg.strip("/")
 
-    for self_file in ("about.md", "corrections.md"):
-        f = repo / "_self" / self_file
-        if f.exists():
-            check(f"_self/{self_file}", summary_length(f), failures, warnings, LIMIT, WARN_AT)
-        else:
-            print(f"FAIL _self/{self_file}: not found")
-            failures.append(f"_self/{self_file} missing")
+    # A project filter scopes the run to that project — /remember step 2.5 uses the
+    # exit code as its routing trigger, so vault-wide _self/ files must not decide it.
+    if not project_filter:
+        for self_file in ("about.md", "corrections.md"):
+            f = repo / "_self" / self_file
+            if f.exists():
+                n = summary_length(f, SELF_LABELS[self_file])
+                check(f"_self/{self_file}", n, failures, warnings, LIMIT, WARN_AT)
+            else:
+                print(f"FAIL _self/{self_file}: not found")
+                failures.append(f"_self/{self_file} missing")
 
     for context in CONTEXTS:
         projects_dir = repo / context / "projects"
@@ -90,7 +110,8 @@ def main() -> int:
             for filename in ("CLAUDE.md", "_memory.md"):
                 f = project_dir / filename
                 if f.exists():
-                    check(f"{label_prefix}/{filename}", summary_length(f), failures, warnings, LIMIT, WARN_AT)
+                    n = summary_length(f, project_label(filename, project_dir.name, context))
+                    check(f"{label_prefix}/{filename}", n, failures, warnings, LIMIT, WARN_AT)
 
     print()
     if failures:

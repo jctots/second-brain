@@ -20,6 +20,13 @@ In all cases, `main` is your local vault branch.
 
 Run: `git diff --name-only main upstream/main`
 
+**The two branches have no common ancestor.** Upstream was created as an orphan branch to strip private content from its history, so `main` and `upstream/main` are permanently diverged. Two consequences:
+
+- Never run `git merge-base main upstream/main` — it always fails. Nothing in this command may assume one.
+- The diff lists files that *differ*, and nothing more. A differing file may be one the vault is ahead on, one upstream is ahead on, or one that is legitimately different in each. Direction is not evidence of origin — inspect each file before assuming the vault version is the improvement.
+
+To confirm the vault is genuinely ahead on a file, run `git show {commit} --stat` on the local commits that touched it and check the change is not already reflected upstream. Branch from `upstream/main` and apply those specific file changes on top of the upstream version — never copy the vault version wholesale.
+
 Filter out content paths — never contribute anything under:
 - `personal/`, `professional/`, `public/` — **except** the second-brain-setup SE docs listed below
 - `_self/`, `_daily/`, `_conversations/`, `_inbox/`
