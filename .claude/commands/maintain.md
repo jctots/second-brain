@@ -196,7 +196,7 @@ Research the PKM + AI landscape, prune implemented items, and update `docs/limit
 
 1. **Understand current state** — read `personal/projects/second-brain-setup/roadmap.md` and `personal/projects/second-brain-setup/architecture.md`. Build a list of all roadmap items and cross-check which are already reflected in the implemented components described in `architecture.md`.
 
-2. **Research** — web-search for similar PKM + AI setups and tools in the current landscape. Focus on: what they offer that sbs doesn't, what sbs has that's unique, and gaps that appear across the field.
+2. **Research** — web-search for similar PKM + AI setups and tools in the current landscape. Focus on: what they offer that this system doesn't, what this system has that's unique, and gaps that appear across the field.
 
 3. **Prune roadmap.md** — cross-check each item against the current implementation list from step 1:
    - Items fully implemented → propose removal or an "implemented" annotation
@@ -245,4 +245,4 @@ Run all checks and report findings. No edits.
 
 4. **Conversation frontmatter** — scan `_conversations/` for files with an empty or missing `projects` field. List as candidates for manual tagging.
 
-5. **Workspace memory violations** — locate `~/.claude/projects/{encoded-repo-path}/memory/`. Read `MEMORY.md`. If any files other than `MEMORY.md` exist, flag with 🚨 and list filenames and content so the user can decide to migrate or delete.
+5. **Workspace memory violations** — auto memory is disabled at source via `"autoMemoryEnabled": false` in `.claude/settings.json`. Verify that setting is still present, then locate `~/.claude/projects/{encoded-repo-path}/memory/`. The directory should not exist. If it does, the setting was lost or overridden — flag with 🚨, list every filename and its content so the user can decide to migrate or delete, and check whether each fact already has a vault home before proposing deletion.

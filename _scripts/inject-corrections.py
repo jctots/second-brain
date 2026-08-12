@@ -8,7 +8,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout = open(sys.stdout.fileno(), mode="w", encoding="utf-8", buffering=1)
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _hook_utils import is_first_turn  # noqa: E402
+from _hook_utils import is_first_turn, hook_budget  # noqa: E402
 
 
 def main():
@@ -29,7 +29,11 @@ def main():
     rules_path = cwd / "_self/corrections.md"
     if rules_path.exists():
         content = rules_path.read_text(encoding="utf-8")
-        print(f"The following are your corrections, loaded automatically at session start:\n\n{content}")
+        header = "The following are your corrections, loaded automatically at session start:\n\n"
+        if len(header) + len(content) > hook_budget(cwd):
+            print("`_self/corrections.md` exceeds the hook budget and was not injected — read it now, then run /maintain option 5 to trim it.")
+        else:
+            print(header + content)
 
 
 if __name__ == "__main__":

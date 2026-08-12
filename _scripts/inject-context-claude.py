@@ -15,6 +15,8 @@ from _hook_utils import (  # noqa: E402
     find_project_from_file,
     strip_ide_selection,
     find_projects_in_message,
+    emit_capped,
+    hook_budget,
 )
 
 
@@ -45,11 +47,14 @@ def main():
         for project_dir in projects:
             claude_md = project_dir / "CLAUDE.md"
             if claude_md.exists():
+                rel = f"{project_dir.parent.parent.name}/projects/{project_dir.name}"
                 label = f"Project CLAUDE.md auto-loaded for `{project_dir.name}` ({project_dir.parent.parent.name}/projects/):"
-                output_parts.append(label + "\n\n" + claude_md.read_text(encoding="utf-8"))
+                full = label + "\n\n" + claude_md.read_text(encoding="utf-8")
+                pointer = f"Project CLAUDE.md for `{project_dir.name}` did not fit the hook budget — read `{rel}/CLAUDE.md` before working on it."
+                output_parts.append((full, pointer))
 
     if output_parts:
-        print("\n\n---\n\n".join(output_parts))
+        print(emit_capped(output_parts, hook_budget(cwd)))
 
 
 if __name__ == "__main__":

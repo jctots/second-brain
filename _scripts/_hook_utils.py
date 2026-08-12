@@ -39,6 +39,44 @@ def load_dotenv(root: Path) -> None:
             os.environ.setdefault(k.strip(), v.strip())
 
 
+def hook_budget(root: Path) -> int:
+    """Return the runtime char cap for one hook's entire stdout.
+
+    Claude Code caps a hook's whole output string at 10,000 chars — anything over is
+    saved to a file and replaced by a ~2KB preview, silently dropping the rest. This
+    sits just under that ceiling: it is the point where injection stops being possible,
+    not the maintenance target. The stricter CI target is HOOK_BUDGET_HARD, checked by
+    _tests/test_hook_budget.py — a file may exceed it and still inject.
+    """
+    load_dotenv(root)
+    try:
+        return int(os.environ.get("HOOK_OUTPUT_CAP", "9800"))
+    except ValueError:
+        return 9800
+
+
+SEP = "\n\n---\n\n"
+
+
+def emit_capped(parts: list[tuple[str, str]], budget: int, sep: str = SEP) -> str:
+    """Join (full, pointer) parts, degrading to `pointer` once `budget` is reached.
+
+    One hook writes one stdout, so a turn that matches several projects puts all of
+    them under a single cap. Parts that no longer fit are emitted as a one-line
+    pointer telling Claude to read the file itself — a visible degradation instead
+    of a silent truncation that drops every part at once.
+    """
+    kept: list[str] = []
+    used = 0
+    for full, pointer in parts:
+        candidate = full if used + len(full) + len(sep) <= budget else pointer
+        if used + len(candidate) + len(sep) > budget:
+            continue
+        kept.append(candidate)
+        used += len(candidate) + len(sep)
+    return sep.join(kept)
+
+
 def get_first_user_message(transcript_path: str) -> str | None:
     """Return text content of the first user message in the transcript."""
     path = Path(transcript_path)
