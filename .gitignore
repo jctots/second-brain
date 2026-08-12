@@ -1,6 +1,18 @@
 # --- CLAUDE CODE ---
 .claude/settings.local.json
 
+# ── secrets ───────────────────────────────────────────────────────────────────
+# `setup.py` writes real credentials into both of these at vault root:
+#   .env       — VIKUNJA_TOKEN, GITEA_TOKEN, ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN
+#   .mcp.json  — the same token values, copied into each MCP server's `env` block
+#
+# This matters most on Tier 1, where your GitHub fork IS your origin: without
+# these entries a single `git add -A` after setup publishes live tokens. Only
+# the `.env.example` templates are meant to be tracked (these patterns match the
+# exact names `.env` and `.mcp.json` only, so `.env.example` is unaffected).
+.env
+.mcp.json
+
 # ── content paths ─────────────────────────────────────────────────────────────
 # Keeps personal content out of this public framework repo. Keep this section
 # as-is — personal content should never be committed to a public fork.
@@ -70,6 +82,10 @@ _inbox/**
 # --- PYTHON ---
 __pycache__/
 *.pyc
+
+# --- GENERATED ---
+# Runtime state written by inject-context-rag.py: `ok`, or `error|TIMESTAMP|REASON`.
+.rag-status
 
 # --- DESKTOP CONFIG ---
 .obsidian/workspace.json

@@ -49,6 +49,14 @@ Use this repo as a GitHub template:
 > ```
 > Forks created from the template already have this rule included.
 
+> **Already have an instance?** Because of that same `merge=ours` rule, your `.gitignore` is never updated by an upstream merge — you have to add new entries yourself. Check that yours ignores these, and add any that are missing:
+> ```
+> .env
+> .mcp.json
+> .rag-status
+> ```
+> `setup.py` writes live credentials into `.env` and `.mcp.json`. On Tier 1, where your GitHub fork is your origin, an untracked `.env` is one `git add -A` away from a public commit. Run `git check-ignore .env .mcp.json .rag-status` — it should echo all three back.
+
 
 ## ⚙️ Step 2: Run setup
 
