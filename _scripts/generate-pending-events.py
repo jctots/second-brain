@@ -90,7 +90,8 @@ def main():
         lines.append(f"_No pending events as of {updated}._")
 
     lines.append("")
-    output_path.write_text("\n".join(lines), encoding="utf-8")
+    with open(output_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(lines))
     print(f"Pending events: {len(pending_entries)} conversation(s) flagged.")
 
 

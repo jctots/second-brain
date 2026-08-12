@@ -41,7 +41,8 @@ def seed_self_files() -> None:
         template = VAULT_ROOT / "_templates" / template_name
         if target.exists() or not template.exists():
             continue
-        target.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
+        with open(target, "w", encoding="utf-8", newline="\n") as f:
+            f.write(template.read_text(encoding="utf-8"))
         created.append(f"_self/{target_name}")
 
     print("\n[_self] Profile files")
@@ -252,7 +253,8 @@ def write_env(updates: dict[str, str]) -> None:
     for k, v in updates.items():
         if k not in updated:
             lines.append(f"{k}={v}")
-    ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    with open(ENV_FILE, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 def read_claude_settings() -> dict:
@@ -266,7 +268,8 @@ def read_claude_settings() -> dict:
 
 def write_claude_settings(settings: dict) -> None:
     CLAUDE_SETTINGS.parent.mkdir(parents=True, exist_ok=True)
-    CLAUDE_SETTINGS.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
+    with open(CLAUDE_SETTINGS, "w", encoding="utf-8", newline="\n") as f:
+        f.write(json.dumps(settings, indent=2) + "\n")
 
 
 def _is_secret(key: str) -> bool:
@@ -353,7 +356,8 @@ def configure_service(service: dict, env: dict, settings: dict) -> tuple[dict, d
                     }
                 }
             }
-            mcp_json_path.write_text(json.dumps(mcp_config, indent=2) + "\n", encoding="utf-8")
+            with open(mcp_json_path, "w", encoding="utf-8", newline="\n") as f:
+                f.write(json.dumps(mcp_config, indent=2) + "\n")
             print(f"  ✓ Written to .mcp.json")
             print("  ↺ Restart Claude Code for MCP changes to take effect.")
 

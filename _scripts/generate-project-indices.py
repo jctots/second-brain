@@ -109,7 +109,8 @@ def _ensure_subdir_index(sub_dir, wl_prefix):
         return sub_index
     project_name = wl_prefix.split("/")[0]
     stub = f"# {sub_dir.name}\n\n[[{project_name}/index|⬅️ {project_name}]]\n"
-    sub_index.write_text(stub, encoding="utf-8")
+    with open(sub_index, "w", encoding="utf-8", newline="\n") as f:
+        f.write(stub)
     print(f"Generated: {sub_index}")
     return sub_index
 
@@ -175,7 +176,8 @@ def update_index(dir_path, index_path, wl_prefix, conv_entries, memory_path=None
         lines = append_section(lines, SECTIONS["relevant conversations"], conv_lines)
 
     new_content = "\n".join(lines).rstrip() + "\n"
-    index_path.write_text(new_content, encoding="utf-8")
+    with open(index_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(new_content)
     print(f"Updated: {index_path}")
 
 

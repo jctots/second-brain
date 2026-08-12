@@ -17,6 +17,7 @@ Scenarios are identified as **T#.#** — first number is the test file, second i
 | T9 | `test_generate_project_indices.py` | `generate-project-indices.py` — subfolder index generation (auto-create, skip conditions, backlink format) |
 | T10 | `test_inject_context_projects.py` | `inject-context-projects.py` — active project registry injection (snapshot extraction, collect_projects, main output format and turn guard) |
 | T11 | `test_check_health.py` | `check-health.py` — first-turn gate, silent when unconfigured, per-service unreachable warnings |
+| T12 | `test_line_endings.py` | R2 — generated files use LF on every platform; static guards against unpinned writes in `_scripts/` |
 
 Fixtures are created in `tempfile.TemporaryDirectory` per test and cleaned up after. Smoke tests run against the real vault (Gitea CI — full content available).
 

@@ -59,6 +59,10 @@ jobs:
         id: t11
         run: python3 _tests/test_check_health.py 2>&1 | tee /tmp/ci_output.txt; exit ${PIPESTATUS[0]}
 
+      - name: T12 — Line endings
+        id: t12
+        run: python3 _tests/test_line_endings.py 2>&1 | tee /tmp/ci_output.txt; exit ${PIPESTATUS[0]}
+
       - name: Notify failure
         if: failure() && secrets.NTFY_URL != ''
         run: |
@@ -74,6 +78,7 @@ jobs:
           [[ "${{ steps.t9.outcome }}" == "failure" ]] && FAILED_STEP="T9 Generate project indices"
           [[ "${{ steps.t10.outcome }}" == "failure" ]] && FAILED_STEP="T10 Inject context projects"
           [[ "${{ steps.t11.outcome }}" == "failure" ]] && FAILED_STEP="T11 Check health"
+          [[ "${{ steps.t12.outcome }}" == "failure" ]] && FAILED_STEP="T12 Line endings"
           if [[ "${{ steps.t1.outcome }}" == "failure" ]]; then
             OUTPUT=$(grep -E "^(FAIL|WARN)" /tmp/ci_output.txt 2>/dev/null || echo "(no output captured)")
           else
