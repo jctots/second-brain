@@ -47,6 +47,25 @@
             "command": "python _scripts/check-health.py"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python _scripts/check-session-tokens.py"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read|Grep|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/env-guard.py"
+          }
+        ]
       }
     ],
     "Stop": [
