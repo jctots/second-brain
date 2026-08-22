@@ -3,7 +3,7 @@ Vault health audit.
 Ask the user which operation:
 
 **(1) Generate artifacts** — run scripts locally, same as CI
-**(2) Tasks sync** — pull task state from Vikunja and reconcile `## Next Actions` across all active projects
+**(2) Tasks sync** — reconcile `## Next Actions` with Vikunja in both directions across all active projects
 **(3) Inbox processing** — route inbox items to the right PARA location
 **(4) Event processing** — surface and process missed events from past conversations
 **(5) Memory maintenance** — condense AI-maintained files that have grown large
@@ -29,17 +29,18 @@ Report: what was regenerated and budget output summary.
 
 ## Option 2 — Service sync
 
-Pull task state from Vikunja and reconcile `## Next Actions` across all active projects. Requires Vikunja MCP configured (`.mcp.json` at project root). Attempt the MCP call; if it fails, report and stop.
+Reconcile `## Next Actions` with Vikunja in both directions across all active projects. `/remember` does no task sync at all, so this is the only place task state moves — run it when task state matters, not after every save. Requires Vikunja MCP configured (`.mcp.json` at project root). Attempt the MCP call; if it fails, report and stop.
 
 1. Read all active project paths from the `## Active Projects` context block. Extract the folder name (last path segment) for each — this is the Vikunja project name.
 
-2. For each project: query Vikunja for all tasks in the project matching the folder name. Separate into open and closed. Always query fresh — do not reuse task results from an earlier `/remember` or `/maintain` run in the same session, as the user may have closed tasks in between.
+2. For each project: query Vikunja for all tasks in the project matching the folder name via `list_tasks` (returns up to 50). Separate into open and closed. Then call `get_task(N)` **only** for `[#N]` IDs present in `## Next Actions` that `list_tasks` did not return — those are past the page limit. Every other ID is already covered; calling `get_task` for it is a redundant round-trip. Always query fresh — do not reuse task results from an earlier run in the same session, as the user may have closed tasks in between.
 
 3. For each project `_memory.md`:
-   - Closed Vikunja tasks matching an entry in `## Next Actions` → remove directly.
-   - Open Vikunja tasks not found in `## Next Actions` → add directly.
+   - **Vikunja → memory.** Closed Vikunja task matching a `## Next Actions` entry → remove the entry. Open Vikunja task with no matching entry → add it (title verbatim, append `[#N]`).
+   - **Memory → Vikunja (close).** Each `✅ `-prefixed entry carrying `[#N]` was completed in a session since the last sync → call `complete_task(N)` directly (no title matching), then remove the line.
+   - **Memory → Vikunja (create).** One `batch_create_tasks` call per project for every entry with no `[#N]` suffix. Append the returned `[#N]` to each line.
 
-4. Write all changes and report: removed (completed on Vikunja), added (Vikunja-only), no-change.
+4. Write all changes and report per project: removed (completed on Vikunja), closed (completed in a session), created (new in Vikunja), added (Vikunja-only), no-change.
 
 ---
 
