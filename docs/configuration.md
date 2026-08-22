@@ -55,7 +55,7 @@ Service health failures are reported in-conversation (via `check-health.py` User
 
 ### Vikunja
 
-Task sync — `/remember` writes next actions to a Vikunja project; `/maintain` closes completed tasks.
+Task sync — `/maintain` option 2 reconciles `## Next Actions` with Vikunja in both directions. `/remember` does no task sync.
 
 | Variable | Notes |
 |---|---|
