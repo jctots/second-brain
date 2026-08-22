@@ -197,6 +197,10 @@ These markers are scanned by `save-conversation.py` and written to the conversat
 - `📋 [task processed]` — emit via `/remember`, **or emit inline immediately after completing a `✅` task directly in this conversation**
 - `📦 [distill processed]` — emit via `/distill` after writing to `resources/`
 
+## Agent tool usage
+
+When spawning non-fork subagents via the Agent tool, route by task shape, not a single fixed model: `haiku` for mechanical/bounded work (pure search, grep, well-specified boilerplate, status parsing, single-doc summarization), `sonnet` for most implementation/debugging/judgment work (also the no-override default), `opus` for ambiguous/high-stakes/architectural work (planning, security-sensitive review, deep code review, root-causing without a repro). Applies only to non-fork agents — a `fork` always inherits the parent's model since it's continuing the same context, so the override is a no-op there. Before delegating at all, weigh whether the context a fresh agent needs (it starts with zero memory of the conversation) would itself cost more tokens than doing the task inline — if so, skip delegation entirely regardless of which tier would apply.
+
 ## Token and cost awareness
 
 - If a task is open-ended or scope is unclear, ask one clarifying question before starting — this is cheaper than doing too much and redoing it.
